@@ -1,4 +1,4 @@
-# Group Rules
+# Ground Rules
 
 1. 연락은 자정 넘어가기 전 반드시 확인하기
 
