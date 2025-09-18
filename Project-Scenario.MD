@@ -11,4 +11,4 @@
 |사용할 소프트웨어 패키지의 명칭과 핵심기능/용도, 사용시나리오| - Flutter: 모바일 앱 레이어 사용</br> - PyTorch: 새 종 판별|
 |사용할 소프트웨어 패키지의 명칭과 URL| - PyTorch: https://pytorch.org/|
 |팀그라운드룰|https://github.com/jun-glitch/JL/blob/main/GroundRule.MD|
-|최종수정일|2025.09.16|
+|최종수정일|2025.09.18|
