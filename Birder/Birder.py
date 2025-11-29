@@ -1,1 +1,1 @@
-print(f"Birder 프로젝트 생성")
+print(f"Birder 한국어 입력되나 좀 보자")
