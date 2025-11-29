@@ -1,1 +1,2 @@
-print(f"Birder 한국어 입력되나 좀 보자")
+if __name__ == "__main__":
+    print(f"main")
