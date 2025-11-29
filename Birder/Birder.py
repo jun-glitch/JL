@@ -1,0 +1,1 @@
+print(f"Birder 프로젝트 생성")
