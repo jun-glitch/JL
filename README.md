@@ -1,26 +1,27 @@
-# JL
-25-2 캡스톤디자인과창업프로젝트A
-<br><br>
-서비스명 : Birder<br>
-프로젝트명: 탐조 입문자를 위한 Image Classification 기반 실시간 새 종 판별 및 새 관측 기록 제공 서비스<br><br>
-주요 기능: <br> 
+# Birder
+25-2 캡스톤디자인과창업프로젝트A Team10 JL
+***
+#### 프로젝트명
+탐조 입문자를 위한 Image Classification 기반 실시간 새 종 판별 및 새 관측 기록 제공 서비스<br>
+#### 주요 기능 <br> 
 1. 위치 정보를 반영한 이미지 검색<br>
 2. 위치 별, 종 별 실시간 관측 기록 검색<br>
-3. 개인 디지털 도감 제공<br><br>
+3. 개인 디지털 도감 제공<br>
+***
+#### Tech Stack
 
-고유 핵심 기술 요소: <br> 
-1. API 데이터를 활용해 학습시킨 딥러닝 AI<br>
-2. 사용자의 탐조 기록 관리를 위한 도감 기능<br>
-3. 사용자에게 관측 정보를 제공하는 기능<br>
-<br>
+##### Backend
+- Python 3.10
+- Django 5.x
+- Django REST Framework
+- PostgreSQL + PostGIS
 
-pain point:<br>
-1. 즉각적인 종 확인의 어려움<br>
-2. 관측 기록 정리의 비효율<br>
-3. 최신 정보의 실시간 공유의 어려움<br>
-<br>
+##### Frontend
+- Flutter
 
-기대성과: <br>
-1. 실시간 종 판별 및 기록 자동화<br>
-2. 조류 관측 기록 DB 구축 및 제공<br>
-3. 입문자 동기 부여<br>
+##### AI / Machine Learning
+- PyTorch
+
+##### Open API
+- Wikimedia Commons API (학습 이미지 수집)
+- eBird API (종 정보 확보)
