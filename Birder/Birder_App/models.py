@@ -3,7 +3,7 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 
 # Create your models here.
-class birder(AbstractUser):
+class birder(models.Model):
     id = models.CharField(max_length=20, primary_key=True)
     class Meta:
         db_table = 'birder'
@@ -22,7 +22,7 @@ class log(models.Model):
         birder,
         on_delete=models.CASCADE,
         db_column='id',
-        to_field='username'
+        to_field='id'
     )
     
     species_code = models.ForeignKey(
