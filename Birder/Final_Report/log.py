@@ -35,4 +35,4 @@ VALUES (?, ?, ?, ?, ?)
 conn.commit()
 conn.close()
 
-print("test_bird.db 생성 & 샘플 데이터 입력 완료")
+print("test_bird.db 생성 & 샘플 데이터 입력 완료!")
