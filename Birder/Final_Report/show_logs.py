@@ -2,7 +2,7 @@ import sqlite3
 from tabulate import tabulate
 from datetime import datetime
 
-DB_PATH = "test_bird.db"   # init_test_db.py 가 만든 db 이름
+DB_PATH = "/Users/yusun/Desktop/JL/test_bird.db"
 
 def format_coord(lat, lon):
     lat_dir = "N" if lat >= 0 else "S"
@@ -27,7 +27,7 @@ def print_city_logs(city_name):
     conn.close()
 
     print(f"\n{city_name} 도요새 상세 관측 기록")
-    print("-" * 40)
+    print("-" * 60)
 
     if not rows:
         print("(해당 도시 데이터 없음)")
@@ -38,13 +38,19 @@ def print_city_logs(city_name):
         coord = format_coord(lat, lon)
         date_str, time_str = format_datetime(observed_at)
 
-        loc_cell = f"{coord}\n{desc}"
-        date_cell = f"{date_str}\n{time_str}"
+        # 각 값을 별도 컬럼에 넣기
+        table.append([coord, desc, date_str, time_str])
 
-        table.append([loc_cell, date_cell])
+    headers = ["관측 위치", "세부 위치", "관측 일자", "관측 시각"]
 
-    headers = ["관측 위치", "관측 일자"]
-    print(tabulate(table, headers=headers, tablefmt="github"))
+    print(
+        tabulate(
+            table,
+            headers=headers,
+            tablefmt="github",
+            colalign=("center", "left", "center", "center"),
+        )
+    )
 
 if __name__ == "__main__":
     print_city_logs("대구광역시")
