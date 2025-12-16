@@ -9,7 +9,7 @@ from PIL import Image
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-DATA_DIR = "data" # data/train/(새종이름)/(이니셜+숫자).jpg 구조를 가진다
+DATA_DIR = "/Users/yusun/Desktop/JL/data" # data/train/(새종이름)/(이니셜+숫자).jpg 구조를 가진다
 MODEL_PATH = "simple_bird_cnn.pth"
 BATCH_SIZE = 8
 NUM_EPOCHS = 15
