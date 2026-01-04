@@ -1,1 +1,0 @@
- C:\\Users\\yunny\\AndroidStudioProjects\\birder_frontend\\.dart_tool\\flutter_build\\1c07d846ed21a6e8304991c3e0eaf750\\native_assets.yaml: 
