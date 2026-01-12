@@ -2,6 +2,7 @@
 // TODO: 이메일 인증 추가 필요
 
 
+import 'package:birder_frontend/screens/log_IN.dart';
 import 'package:birder_frontend/services/auth_api.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -15,12 +16,12 @@ class SignupStepperPage extends StatefulWidget {
 
 class _SignupStepperPageState extends State<SignupStepperPage> {
   final Dio _dio = Dio(BaseOptions(
-    baseUrl: 'http://10.0.2.2:8000', // 안드로이드 에뮬레이터 기준
+    baseUrl: 'http://127.0.0.1:8000', // 안드로이드 에뮬레이터 기준
     connectTimeout: const Duration(seconds: 5),
     receiveTimeout: const Duration(seconds: 10),
   ));
 
-  final auth = AuthApi('http://10.0.2.2:8000');
+  final auth = AuthApi('http://127.0.0.1:8000');
   // 에뮬레이터면 10.0.2.2
   // 실폰이면 http://내PC_IP:8000 또는 배포 도메인
 
@@ -29,6 +30,7 @@ class _SignupStepperPageState extends State<SignupStepperPage> {
       "username": _idCtrl.text.trim(),
       "email": _emailCtrl.text.trim(),
       "password": _pwCtrl.text,
+      "password_confirm": _pwConfirmCtrl.text,
       "name": _nameCtrl.text.trim(),
       "agreeTerms": _agreeTerms,
       "agreePrivacy": _agreePrivacy,
@@ -41,8 +43,17 @@ class _SignupStepperPageState extends State<SignupStepperPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('가입 완료!')),
       );
-      Navigator.pop(context); // 로그인 화면으로
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+            (route) => false,
+      ); // 회원페이지로
     } on DioException catch (e) {
+      debugPrint('Dio type: ${e.type}');
+      debugPrint('Dio msg: ${e.message}');
+      debugPrint('status: ${e.response?.statusCode}');
+      debugPrint('data: ${e.response?.data}');
+      debugPrint('url: ${e.requestOptions.uri}');
+
       String msg = '가입 실패';
 
       final data = e.response?.data;

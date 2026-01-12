@@ -209,9 +209,6 @@ class _FindPasswordPageState extends State<FindPasswordPage> {
                       const SizedBox(height: 16),
                     ],
 
-
-
-
                   ),
                 ),
               ),
