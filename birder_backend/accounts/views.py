@@ -77,7 +77,7 @@ class FindUsernameView(APIView):
         except User.DoesNotExist:
             return Response({"error" : "해당 이메일로 가입된 아이디가 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
-# 비밀번호 찾기
+# 비밀번호 찾기 기능에서 아이디, 이메일 확인 후 비밀번호 재설정 페이지 링크를 이메일로 전송
 class FindPwdView(APIView):
     permission_classes = [AllowAny]
     def post(self, request):
@@ -92,38 +92,35 @@ class FindPwdView(APIView):
         
         try:
             user = User.objects.get(email=email, id=username)
+
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = default_token_generator.make_token(user)
+
+            reset_link = f"http://localhost:3000/change-pwd/{uid}/{token}"
+
+            send_mail(
+                '비밀번호 재설정 안내',
+                f'해당 링크를 클릭하여 비밀번호를 재설정하세요: {reset_link}',
+                [email]
+            )
+            return Response({"message" : "이메일로 비밀번호 재설정 링크가 전송되었습니다. 도착하지 않은 경우 스팸메일함을 확인해주세요."}, status=status.HTTP_200_OK)
             
         except User.DoesNotExist:
             return Response({"error" : "해당 정보로 가입된 계정이 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
-# 비밀번호 변경: 1. 로그인 중 변경 2. 비밀번호 찾기 이메일에서 랜딩
-class ChangePwdView(APIView):
+# 로그인 상태에서 비밀번호 변경을 위한 본인 인증 > 비밀번호 재입력
+class CheckPwdView(APIView):
     permission_classes = [IsAuthenticated]
     def post(self, request):
-        user = request.user
-        old_pwd = request.data.get('old_pwd')
-        new_pwd = request.data.get('new_pwd')
-        new_pwd_confirm = request.data.get('new_pwd_confirm')
+        user = request.user # 현재 로그인되어 있는 계정 가져오기
+        pwd = request.data.get('pwd')
 
-        if not user.check_password(old_pwd):
-            return Response({"error" : "기존 비밀번호가 일치하지 않습니다."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # 새로운 비밀번호 확인이 틀린 경우 > front에서 그냥 막아주면 좋을 듯
-        if new_pwd != new_pwd_confirm:
-            return Response({"error" : "새 비밀번호가 일치하지 않습니다."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # 가입할 때 사용했던 비밀번호 유효성 검사
-        try:
-            validate_password(new_pwd, user)
-        except Exception as e:
-            return Response({"error" : list(e.messages)}, status=status.HTTP_400_BAD_REQUEST)
-        
-        user.set_password(new_pwd)
-        user.save()
+        if  user.check_password(pwd):
+            uid = urlsafe_base64_encode(force_bytes(user.pk)) # 현재 사용자의 pk 암호화
+            token = default_token_generator.make_token(user)
+            return Response({"uidb64" : uid, "token" : token}, status=status.HTTP_200_OK)
 
-        update_session_auth_hash(request, user)
-
-        return Response({"message" : "비밀번호가 성공적으로 변경되었습니다."}, status=status.HTTP_200_OK)
+        return Response({"error" : "틀린 비밀번호입니다."}, status=status.HTTP_200_OK)
 
 # 새 비밀번호 변경 페이지 - 비밀번호 찾기, 변경 공동 페이지
 class SetPwdView(APIView):
