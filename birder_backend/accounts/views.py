@@ -95,7 +95,7 @@ class FindPwdView(APIView):
             return  Response({"error" : "이메일을 입력해주세요."}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            user = User.objects.get(email=email, id=username)
+            user = User.objects.get(email=email, username=username)
 
             uid = urlsafe_base64_encode(force_bytes(user.pk))
             token = default_token_generator.make_token(user)
@@ -105,6 +105,7 @@ class FindPwdView(APIView):
             send_mail(
                 '비밀번호 재설정 안내',
                 f'해당 링크를 클릭하여 비밀번호를 재설정하세요: {reset_link}',
+                'admin@test.com',
                 [email]
             )
             return Response({"message" : "이메일로 비밀번호 재설정 링크가 전송되었습니다. 도착하지 않은 경우 스팸메일함을 확인해주세요."}, status=status.HTTP_200_OK)
