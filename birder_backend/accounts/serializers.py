@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
-
+from .models import UserSettings
 
 class SignupSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=15) # 사용자 ID, 15자 이내로 제한
@@ -37,4 +37,11 @@ class SignupSerializer(serializers.Serializer):
             email=validated_data["email"],
             password=validated_data["password"],  # 비밀번호는 자동으로 해시 처리됨
         )
+        UserSettings.objects.create(user=user)
         return user
+
+class UserSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserSettings
+        fields = ["notifications_enabled", "location_enabled", "updated_at"]
+        read_only_fields = ["updated_at"]

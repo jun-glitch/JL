@@ -1,12 +1,16 @@
+from urllib import request
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
+from .models import UserSettings
+from rest_framework_simplejwt.tokens import RefreshToken
 
 # 접근 권한 설정
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
 # 회원가입 입력 검증용 Serializer
-from .serializers import SignupSerializer
+from .serializers import SignupSerializer,UserSettingsSerializer
 
 # 회원 테이블 접근용 User
 from django.contrib.auth.models import User
@@ -113,3 +117,33 @@ class ChangePwdView(APIView):
         update_session_auth_hash(request, user)
 
         return Response({"message" : "비밀번호가 성공적으로 변경되었습니다."}, status=status.HTTP_200_OK)
+
+class SettingsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        settings_obj, _ = UserSettings.objects.get_or_create(user=request.user)
+        serializer = UserSettingsSerializer(settings_obj)
+        return Response(serializer.data)
+
+    def patch(self, request):
+        settings_obj, _ = UserSettings.objects.get_or_create(user=request.user)
+        serializer = UserSettingsSerializer(settings_obj, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+        
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        refresh = request.data.get("refresh")
+        if not refresh:
+            return Response(
+                {"detail": "refresh token required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        token = RefreshToken(refresh)
+        token.blacklist()
+        return Response(status=status.HTTP_204_NO_CONTENT)
