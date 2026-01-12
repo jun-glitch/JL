@@ -17,6 +17,17 @@ from django.contrib.auth import update_session_auth_hash
 # 가입 시 사용했던 비밀번호 유효성 검사
 from django.contrib.auth.password_validation import validate_password
 
+# pk encode, decode용
+from django.utils.http import urlsafe_base64_encode
+from django.utils.http import urlsafe_base64_decode
+from django.utils.encoding import force_bytes
+
+# token 발행
+from django.contrib.auth.tokens import default_token_generator
+
+# 메일 전송
+from django.core.mail import send_mail
+
 # 회원가입 API 뷰
 class SignupView(APIView):
     permission_classes = [AllowAny] # 누구나 접근 가능(로그인 전 사용자도 접근 가능해야 해서)
@@ -113,3 +124,32 @@ class ChangePwdView(APIView):
         update_session_auth_hash(request, user)
 
         return Response({"message" : "비밀번호가 성공적으로 변경되었습니다."}, status=status.HTTP_200_OK)
+
+# 새 비밀번호 변경 페이지 - 비밀번호 찾기, 변경 공동 페이지
+class SetPwdView(APIView):
+    permission_classes = [AllowAny] # 해당 화면에 들어온 사용자는 모두 가능
+    def post(self, request):
+        uidb64 = request.data.get('uidb64')
+        token = request.data.get('token') # 비밀번호 변경 > 본인 인증용 비밀번호 재확인 페이지에서 토큰 발행 // 비밀번호 찾기 > 본인 인증 후 이메일에 보낼 때 토큰 발행
+        new_pwd = request.data.get('new_pwd')
+        new_pwd_confirm = request.data.get('new_pwd_confirm')
+        try:
+            uid = urlsafe_base64_decode(uidb64).decode() # 비밀번호 변경/찾기 할 때 사용된 user의 encode된 pk 받기
+            user = User.objects.get(pk=uid)
+            
+            # 발행된 토큰 유효성 검증
+            if not default_token_generator.check_token(user, token):
+                return Response({"error" : "링크의 유효기한이 만료되었습니다."}, status=800) # 800 error 발생 시 링크 만료 안내
+
+            if new_pwd != new_pwd_confirm:
+                return Response({"error" : "새 비밀번호가 일치하지 않습니다"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            validate_password(new_pwd, user)
+
+            user.set_password(new_pwd)
+            user.save()
+            update_session_auth_hash(request, user) # 로그인 상태 유지
+
+            return Response({"message" : "비밀번호가 성공적으로 변경되었습니다."}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error" : list(e.messages)})
