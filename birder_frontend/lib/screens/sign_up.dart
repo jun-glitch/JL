@@ -2,6 +2,8 @@
 // TODO: 이메일 인증 추가 필요
 
 
+import 'package:birder_frontend/services/auth_api.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 class SignupStepperPage extends StatefulWidget {
@@ -12,6 +14,60 @@ class SignupStepperPage extends StatefulWidget {
 }
 
 class _SignupStepperPageState extends State<SignupStepperPage> {
+  final Dio _dio = Dio(BaseOptions(
+    baseUrl: 'http://10.0.2.2:8000', // 안드로이드 에뮬레이터 기준
+    connectTimeout: const Duration(seconds: 5),
+    receiveTimeout: const Duration(seconds: 10),
+  ));
+
+  final auth = AuthApi('http://10.0.2.2:8000');
+  // 에뮬레이터면 10.0.2.2
+  // 실폰이면 http://내PC_IP:8000 또는 배포 도메인
+
+  Future<void> _submit() async {
+    final payload = {
+      "id": _idCtrl.text.trim(),
+      "email": _emailCtrl.text.trim(),
+      "password": _pwCtrl.text,
+      "name": _nameCtrl.text.trim(),
+      "agreeTerms": _agreeTerms,
+      "agreePrivacy": _agreePrivacy,
+    };
+
+    try {
+      await _dio.post('/api/auth/signup/', data: payload);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('가입 완료!')),
+      );
+      Navigator.pop(context); // 로그인 화면으로
+    } on DioException catch (e) {
+      String msg = '가입 실패';
+
+      final data = e.response?.data;
+      if (data is Map) {
+        if (data["detail"] != null) msg = data["detail"].toString();
+        else if (data["message"] != null) msg = data["message"].toString();
+        else if (data["username"] != null) msg = data["username"].toString();
+        else if (data["email"] != null) msg = data["email"].toString();
+        else msg = data.toString();
+      } else if (data != null) {
+        msg = data.toString();
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('네트워크 오류')),
+      );
+    }
+  }
+
   int _currentStep = 0;
 
   final _formKeys = List.generate(3, (_) => GlobalKey<FormState>());
@@ -74,21 +130,6 @@ class _SignupStepperPageState extends State<SignupStepperPage> {
     setState(() => _currentStep -= 1);
   }
 
-  Future<void> _submit() async {
-    final payload = {
-      "id": _idCtrl.text.trim(),
-      "email": _emailCtrl.text.trim(),
-      "password": _pwCtrl.text,
-      "name": _nameCtrl.text.trim(),
-
-      "agreeTerms": _agreeTerms,
-      "agreePrivacy": _agreePrivacy,
-    };
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('가입 완료! ${payload["email"]}')),
-    );
-  }
 
   StepState _stepState(int index) {
     if (_completed[index]) return StepState.complete;
