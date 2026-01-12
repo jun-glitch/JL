@@ -26,7 +26,7 @@ class _SignupStepperPageState extends State<SignupStepperPage> {
 
   Future<void> _submit() async {
     final payload = {
-      "id": _idCtrl.text.trim(),
+      "username": _idCtrl.text.trim(),
       "email": _emailCtrl.text.trim(),
       "password": _pwCtrl.text,
       "name": _nameCtrl.text.trim(),
@@ -191,8 +191,7 @@ class _SignupStepperPageState extends State<SignupStepperPage> {
                     validator: (v) {
                       final value = (v ?? '').trim();
                       if (value.isEmpty) return '아이디를 입력해 주세요.';
-                      final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
-                      if (!emailRegex.hasMatch(value)) return '아이디 형식이 올바르지 않습니다.';
+
                       return null;
                     },
                   ),
