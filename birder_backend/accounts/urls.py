@@ -12,5 +12,5 @@ urlpatterns = [
     path("refresh/", TokenRefreshView.as_view(), name="refresh"), # 리프레시 토큰으로 액세스 토큰 재발급
     path("me/", MeView.as_view(), name="me"), # 현재 로그인한 사용자 정보 반환 API
     path('find-username/', FindUsernameView.as_view(), name="find_username"), # email 입력받아 회원 아이디 찾기
-    path('change-pwd/', ChangePwdView.as_view(), name="change_pwd"), # 비밀번호 변경
+    path('change-pwd/', CheckPwdView.as_view(), name="change_pwd"), # 비밀번호 변경
 ]
