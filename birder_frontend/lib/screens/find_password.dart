@@ -55,7 +55,6 @@ class _FindPasswordPageState extends State<FindPasswordPage> {
   String? _validateId(String? v) {
     final value = (v ?? '').trim();
     if (value.isEmpty) return '아이디를 입력해 주세요.';
-    if (value.length < 4) return '아이디는 4자 이상 입력해 주세요.'; // 필요시 팀 규칙으로 변경
     return null;
   }
 
@@ -71,7 +70,7 @@ class _FindPasswordPageState extends State<FindPasswordPage> {
     final ok = _formKey.currentState?.validate() ?? false;
     if (!ok) return;
 
-    // TODO: 서버 호출 (id + email로 사용자 확인 후, email로 인증번호 발송)
+    // TODO: 서버 호출 (id + email로 사용자 확인 후, email로 비밀번호 변경 페이지 링크 전송)
     // await api.sendResetPwCode(id: _idCtrl.text.trim(), email: _emailCtrl.text.trim());
 
     setState(() {
@@ -83,70 +82,8 @@ class _FindPasswordPageState extends State<FindPasswordPage> {
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('인증번호를 이메일로 전송했어요.')),
+      const SnackBar(content: Text('비밀번호 변경 링크를 이메일로 전송했어요.')),
     );
-  }
-
-  Future<void> _verifyCode() async {
-    if (!_codeSent) return;
-
-    final code = _codeCtrl.text.trim();
-
-    // TODO: 서버 호출 (id + email + code 검증)
-    // final ok = await api.verifyResetPwCode(
-    //   id: _idCtrl.text.trim(),
-    //   email: _emailCtrl.text.trim(),
-    //   code: code,
-    // );
-
-    final ok = RegExp(r'^\d{6}$').hasMatch(code); // 임시: 6자리 숫자면 통과
-
-    setState(() => _verified = ok);
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(ok ? '인증이 완료됐어요.' : '인증번호가 올바르지 않아요.')),
-    );
-  }
-
-  Future<void> _resetPassword() async {
-    if (!_verified) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('인증을 먼저 완료해 주세요.')),
-      );
-      return;
-    }
-
-    final newPw = _newPwCtrl.text;
-    final newPw2 = _newPwConfirmCtrl.text;
-
-    if (newPw.length < 8) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('비밀번호는 8자 이상이어야 합니다.')),
-      );
-      return;
-    }
-    if (newPw != newPw2) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('새 비밀번호가 일치하지 않습니다.')),
-      );
-      return;
-    }
-
-    // TODO: 서버 호출 (비밀번호 재설정)
-    // await api.resetPassword(
-    //   id: _idCtrl.text.trim(),
-    //   email: _emailCtrl.text.trim(),
-    //   code: _codeCtrl.text.trim(),
-    //   newPassword: newPw,
-    // );
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('비밀번호가 재설정되었어요. 로그인해 주세요.')),
-    );
-
-    Navigator.of(context).pop(); // 로그인 화면으로
   }
 
   @override
@@ -259,7 +196,7 @@ class _FindPasswordPageState extends State<FindPasswordPage> {
                           ),
                           onPressed: _remainSec > 0 ? null : _sendVerificationCode,
                           child: Text(
-                            _remainSec > 0 ? '인증번호 재발송 ($_remainSec초)' : '인증번호 발송',
+                            _remainSec > 0 ? '변경 링크  재발송 ($_remainSec초)' : '링크 전송',
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
@@ -270,73 +207,11 @@ class _FindPasswordPageState extends State<FindPasswordPage> {
                       ),
 
                       const SizedBox(height: 16),
-
-                      // 인증번호 입력 (발송 후)
-                      if (_codeSent) ...[
-                        TextFormField(
-                          controller: _codeCtrl,
-                          keyboardType: TextInputType.number,
-                          decoration: _fieldDeco(
-                            '인증번호 (6자리)',
-                            suffix: TextButton(
-                              onPressed: _verifyCode,
-                              child: const Text('확인'),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-
-                        Text(
-                          _verified ? '✅ 인증 완료' : '인증이 필요해요.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: _verified ? Colors.green[800] : Colors.black54,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-
-                      // 새 비밀번호/확인 (인증 완료 후)
-                      if (_verified) ...[
-                        TextFormField(
-                          controller: _newPwCtrl,
-                          obscureText: true,
-                          decoration: _fieldDeco('새 비밀번호 (8자 이상)'),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _newPwConfirmCtrl,
-                          obscureText: true,
-                          decoration: _fieldDeco('새 비밀번호 확인'),
-                        ),
-                        const SizedBox(height: 16),
-
-                        SizedBox(
-                          height: 52,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: btnColor,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
-                            onPressed: _resetPassword,
-                            child: const Text(
-                              '비밀번호 재설정',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.black,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-
-                      const SizedBox(height: 12),
                     ],
+
+
+
+
                   ),
                 ),
               ),
