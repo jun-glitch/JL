@@ -1,7 +1,9 @@
+import 'package:birder_frontend/screens/log_in.dart';
+import 'package:birder_frontend/screens/my_log.dart';
+import 'package:birder_frontend/screens/sign_up.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-// HomeScreen 위젯은 StatefulWidget을 상속받음
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -9,7 +11,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-// _HomeScreenState 클래스는 HomeScreen 위젯의 상태를 관리
+
 class _HomeScreenState extends State<HomeScreen> {
   bool _isNewSearchExpanded = false; // 새 검색 버튼 확장 여부
 
@@ -28,13 +30,32 @@ class _HomeScreenState extends State<HomeScreen> {
     final double mid = screenSize.width * 0.38;
     final double small = screenSize.width * 0.27;
 
+    const sky = Color(0xFFDCEBFF);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFEDF5FF),
+      backgroundColor: sky,
+      appBar: AppBar(
+        backgroundColor: sky, // 앱바색
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: IconButton(
+              iconSize: 30,
+              icon: const Icon(Icons.person),
+              onPressed: () {
+                Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const LoginPage())
+                );
+              },
+            ),
+          ),
+        ],
+      ),
       body: Stack(
         children: [
           // 'Birder' 로고
           Positioned(
-            top: screenSize.height * 0.2,
+            top: screenSize.height * 0.1,
             left: 0,
             right: 0,
             child: Center(
@@ -49,67 +70,76 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // 'MY Log'
+          // MY Log
           _buildBubbleButton(
             screenSize: screenSize,
-            top: screenSize.height * 0.35,
+            top: screenSize.height * 0.25,
             left: screenSize.width * 0.10,
             size: mid,
             text: 'MY Log',
-            onTap: () => print('MY Log 클릭!'),
+            textHeight: 1.0,
+            onTap: () {
+              Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const MyLogPage())
+              );
+            },
           ),
 
-          // 'Birder\'s Log'
+          // Birder's Log
           _buildBubbleButton(
             screenSize: screenSize,
-            top: screenSize.height * 0.41,
+            top: screenSize.height * 0.31,
             left: screenSize.width * 0.50,
             size: mid * 0.85,
             text: 'Birder\'s \n Log',
-            onTap: () => print('Birder\'s Log 클릭!'),
+            textHeight: 0.9,
+            onTap: () {},
           ),
 
-          // '설정'
+
+          // 설정
           _buildBubbleButton(
             screenSize: screenSize,
-            top: screenSize.height * 0.55,
+            top: screenSize.height * 0.45,
             left: screenSize.width * 0.72,
             size: small,
             text: '설정',
+            textHeight: 1.0,
             onTap: () => print('설정 클릭!'),
           ),
 
-          // '새 검색' (가장 큰 버튼)
+          // 새 검색 (메인 버튼)
           _buildBubbleButton(
             screenSize: screenSize,
-            top: screenSize.height * 0.53,
+            top: screenSize.height * 0.43,
             left: screenSize.width * 0.07,
             size: big,
             text: '새 검색',
+            textHeight: 1.0,
             onTap: _toggleNewSearch,
-            backgroundColor: _isNewSearchExpanded ? Colors.blue[200] : Colors.blue[200],
+            backgroundColor: _isNewSearchExpanded ? const Color(0xFFA1C4FD) : const Color(0xFFA1C4FD),
           ),
 
           // 새 검색 서브 메뉴 (확장 시)
           _buildAnimatedBubbleButton(
             screenSize: screenSize,
-            top: screenSize.height * 0.35,
+            top: screenSize.height * 0.25,
             left: screenSize.width * 0.10,
             size: mid,
-            text: '사진 \n 업로드',
-            onTap: () => print('사진 업로드 클릭!'),
-          ),
-          _buildAnimatedBubbleButton(
-            screenSize: screenSize,
-            top: screenSize.height * 0.41,
-            left: screenSize.width * 0.50,
-            size: mid * 0.85,
             text: '촬영',
             onTap: () => print('촬영 클릭!'),
           ),
           _buildAnimatedBubbleButton(
             screenSize: screenSize,
-            top: screenSize.height * 0.55,
+            top: screenSize.height * 0.31,
+            left: screenSize.width * 0.50,
+            size: mid * 0.85,
+            text: '사진 \n 업로드',
+            onTap: () => print('사진 업로드 클릭!'),
+          ),
+          _buildAnimatedBubbleButton(
+            screenSize: screenSize,
+            top: screenSize.height * 0.45,
             left: screenSize.width * 0.72,
             size: small,
             text: 'cancel',
@@ -130,6 +160,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required double size,
     required String text,
     required VoidCallback onTap,
+    required double textHeight,
     Color? backgroundColor,
     Color textColor = Colors.black,
   }) {
@@ -142,7 +173,7 @@ class _HomeScreenState extends State<HomeScreen> {
           width: size,
           height: size,
           decoration: BoxDecoration(
-            color: backgroundColor ?? Colors.blue[200],
+            color: backgroundColor ?? const Color(0xFFA1C4FD),
             shape: BoxShape.circle,
           ),
           child: Center(
@@ -151,17 +182,18 @@ class _HomeScreenState extends State<HomeScreen> {
               textAlign: TextAlign.center,
               style: GoogleFonts.jua(
                 fontSize: size * 0.23,
-                fontWeight: FontWeight.bold,
                 color: textColor,
+                height: 1.15, //
               ),
             ),
           ),
+
         ),
       ),
     );
   }
 
-  // 애니메이션 버튼 (새 검색 서브 메뉴용)
+  // 애니메이션 버튼 (서브 메뉴)
   Widget _buildAnimatedBubbleButton({
     required Size screenSize,
     required double top,
@@ -193,7 +225,7 @@ class _HomeScreenState extends State<HomeScreen> {
             onTap: onTap,
             child: Container(
               decoration: BoxDecoration(
-                color: backgroundColor ?? Colors.blue[200],
+                color: backgroundColor ?? const Color(0xFFA1C4FD),
                 shape: BoxShape.circle,
               ),
               child: Center(
@@ -202,7 +234,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   textAlign: TextAlign.center,
                   style: GoogleFonts.jua(
                     fontSize: size * 0.23,
-                    fontWeight: FontWeight.bold,
                     color: textColor,
                   ),
                 ),

@@ -4,7 +4,7 @@ from django.urls import path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 # 회원가입 처리, 현재 로그인한 사용자 정보 반환, 아이디·비밀번호 찾기
-from .views import SignupView, MeView, FindUsernameView, ChangePwdView, LogoutView, SettingsView
+from .views import SignupView, MeView, FindUsernameView, FindPwdView, CheckPwdView, SetPwdView, ChangePwdView, LogoutView, SettingsView
 
 urlpatterns = [
     path("signup/", SignupView.as_view(), name="signup"), # 회원가입 API, Serializer로 입력값 검증 후 User 생성
@@ -15,4 +15,5 @@ urlpatterns = [
     path('change-pwd/', ChangePwdView.as_view(), name='change_pwd'), # 비밀번호 변경
     path("settings/", SettingsView.as_view(), name="settings"),
     path("logout/", LogoutView.as_view(), name="logout"),
+
 ]
