@@ -40,6 +40,7 @@ class SignupSerializer(serializers.Serializer):
         UserSettings.objects.create(user=user)
         return user
 
+# UserSettings model의 Serializer
 class UserSettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserSettings

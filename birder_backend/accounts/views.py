@@ -155,33 +155,43 @@ class SetPwdView(APIView):
             return Response({"message" : "비밀번호가 성공적으로 변경되었습니다."}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error" : list(e.messages)})
-        
+
+ # 사용자 설정 조회 및 수정 API       
 class SettingsView(APIView):
     permission_classes = [IsAuthenticated]
 
+    # 설정 조회 및 수정
     def get(self, request):
+        # 현재 로그인한 사용자의 설정 가져오기 
         settings_obj, _ = UserSettings.objects.get_or_create(user=request.user)
         serializer = UserSettingsSerializer(settings_obj)
         return Response(serializer.data)
 
+    # 설정 수정
     def patch(self, request):
+        # 현재 로그인한 사용자의 설정 가져오기 
         settings_obj, _ = UserSettings.objects.get_or_create(user=request.user)
         serializer = UserSettingsSerializer(settings_obj, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
+        serializer.is_valid(raise_exception=True) # 입력값 검증
+        serializer.save() # 검증 통과 시 DB에 변경사항 저장
         return Response(serializer.data)
-        
+
+# 로그아웃 API        
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        refresh = request.data.get("refresh")
+        refresh = request.data.get("refresh") # 프론트에서 전달한 refresh token 받기
+        
         if not refresh:
             return Response(
                 {"detail": "refresh token required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # refresh token 블랙리스트에 추가하여 무효화 -> 이후 이 토큰으로는 access 불가
         token = RefreshToken(refresh)
         token.blacklist()
+
+        # 성공 응답 반환
         return Response(status=status.HTTP_204_NO_CONTENT)
