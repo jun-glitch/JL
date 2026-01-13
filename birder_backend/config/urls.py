@@ -17,7 +17,16 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 
+# media 파일 서빙을 위한 import
+from django.conf import settings
+from django.conf.urls.static import static
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path("api/auth/", include("accounts.urls")),
+    path("api/birds/", include("birds.urls")),
 ]
+
+# 개발 환경에서만 media 파일 서빙 설정 추가 -> 나중에 supabase storage로 대체 예정
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
