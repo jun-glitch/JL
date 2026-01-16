@@ -11,14 +11,39 @@ class BirdersLogSpecies extends StatefulWidget {
 }
 
 class _BirdersLogSpeciesState extends State<BirdersLogSpecies> {
+  final TextEditingController _searchCtrl = TextEditingController();
+
+  // 임시 리스트
+  final List<String> _allSpecies = const [
+    '참새',
+    '까치',
+    '비둘기',
+    '직박구리',
+    '까마귀',
+  ];
+
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    const sky = Color(0xFFDCEBFF);
 
-    const sky = Color(0xFFDCEBFF); // 연한 하늘색
+    // 검색 결과 필터링
+    final results = _allSpecies
+        .where((s) => s.toLowerCase().contains(_query.trim().toLowerCase()))
+        .toList();
+
+    final bool hasQuery = _query.trim().isNotEmpty;
+    final bool hasResults = results.isNotEmpty;
 
     return Scaffold(
-      backgroundColor: sky, // 화면 배경색
+      backgroundColor: sky,
       appBar: AppBar(
         backgroundColor: sky,
         elevation: 0,
@@ -33,7 +58,7 @@ class _BirdersLogSpeciesState extends State<BirdersLogSpecies> {
                 fontSize: 35,
                 fontWeight: FontWeight.bold,
                 color: Colors.black,
-                height: 2.0, // 줄간격
+                height: 2.0,
               ),
             ),
             const SizedBox(height: 2),
@@ -48,8 +73,120 @@ class _BirdersLogSpeciesState extends State<BirdersLogSpecies> {
         ),
       ),
 
-      body: Column(
+      body: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 1) 종별로 보기
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Transform.translate(
+                    offset: const Offset(0, -6),
+                    child: Image.asset(
+                      'assets/images/Birder_logo_bird.png',
+                      width: 45,
+                      height: 45,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    '종별로 보기',
+                    style: GoogleFonts.jua(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w400,
+                      color: Colors.black,
+                    ),
+                  ),
+                ],
+              ),
 
+              const SizedBox(height: 14),
+
+              // 2) 검색바
+              Container(
+                height: 56,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.85),
+                  borderRadius: BorderRadius.circular(28),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.search, size: 28, color: const Color(0xFFA1C4FD)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: _searchCtrl,
+                        onChanged: (v) => setState(() => _query = v),
+                        decoration: InputDecoration(
+                          border: InputBorder.none,
+                          hintText: '새명을 입력하세요',
+                          hintStyle: GoogleFonts.jua(
+                            fontSize: 18,
+                            color: const Color(0xFFA1C4FD),
+                          ),
+                        ),
+                        style: GoogleFonts.jua(
+                          fontSize: 18,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ),
+                    if (_query.isNotEmpty)
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.black45),
+                        onPressed: () {
+                          _searchCtrl.clear();
+                          setState(() => _query = '');
+                        },
+                      ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // 3) 결과 영역
+              Expanded(
+                child: Builder(
+                  builder: (context) {
+                    final hasQuery = _query.trim().isNotEmpty;
+                    final hasResults = results.isNotEmpty;
+
+                    // 1) 기본 화면 (인기 검색어, 계절별 새 목록)
+                    if (!hasQuery) {
+                      // TODO: 검색 전 기본 화면 UI
+                      return const SizedBox.shrink();
+                    }
+
+                    // 3) 검색 결과 없음
+                    if (!hasResults) {
+                      return Center(
+                        child: Text(
+                          '검색 결과 없음',
+                          style: GoogleFonts.jua(
+                            fontSize: 18,
+                            color: Colors.black54,
+                          ),
+                        ),
+                      );
+                    }
+
+                    // 2) 검색 결과 있음
+                    // TODO: 검색 결과 UI
+                    return const SizedBox.shrink();
+                  },
+                ),
+              ),
+
+            ],
+          ),
+        ),
       ),
     );
   }
