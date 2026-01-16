@@ -91,7 +91,7 @@ class _MyLogPageState extends State<MyLogPage> {
                   crossAxisCount: 3,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
-                  childAspectRatio: 0.9,
+                  childAspectRatio: 0.75,
                 ),
                 delegate: SliverChildBuilderDelegate(
                       (context, index) {
