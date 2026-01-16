@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:birder_frontend/screens/birders_log_area.dart';
+import 'package:birder_frontend/screens/birders_log_species.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:birder_frontend/screens/bird_tile.dart';
@@ -62,7 +64,11 @@ class _BirdersLogMainState extends State<BirdersLogMain> {
             Expanded(
               child: _MenuCardButton(
                 label: '지역별로 보기',
-                onTap: () => print('지역별로 보기 클릭'),
+                onTap: () {
+                  Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const BirdersLogArea())
+                  );
+                },
                 iconWidget: Image.asset(
                   'assets/images/location.png',
                   width: 115,
@@ -75,7 +81,11 @@ class _BirdersLogMainState extends State<BirdersLogMain> {
             Expanded(
               child: _MenuCardButton(
                 label: '종별로 보기',
-                onTap: () => print('종별로 보기 클릭'),
+                onTap: () {
+                  Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const BirdersLogSpecies())
+                  );
+                },
                 iconWidget: Image.asset(
                   'assets/images/Birder_logo_bird.png',
                   fit: BoxFit.contain,
