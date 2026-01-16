@@ -58,7 +58,7 @@ class _MyLogPageState extends State<MyLogPage> {
         title: Text(
           'Birder',
           style: GoogleFonts.lobster(
-            fontSize: 30,
+            fontSize: 35,
             fontWeight: FontWeight.bold,
             color: Colors.black,
           ),

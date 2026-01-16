@@ -1,8 +1,15 @@
+import 'dart:io';
+
+import 'package:birder_frontend/screens/birders_log_main.dart';
 import 'package:birder_frontend/screens/log_in.dart';
 import 'package:birder_frontend/screens/my_log.dart';
 import 'package:birder_frontend/screens/sign_up.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart'  as p;
+import 'package:path_provider/path_provider.dart';
+import 'saved_image_page.dart' as pages;
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,6 +26,54 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _isNewSearchExpanded = !_isNewSearchExpanded;
     });
+  }
+
+  final ImagePicker _picker = ImagePicker();
+
+  Future<void> _openCameraAndSave() async {
+  final XFile? photo = await _picker.pickImage(source: ImageSource.camera);
+  if (photo == null) return;
+
+  final dir = await getApplicationDocumentsDirectory();
+
+  final ext0 = p.extension(photo.path);
+  final ext = ext0.isNotEmpty ? ext0 : '.jpg';
+
+  final fileName = 'photo_${DateTime.now().millisecondsSinceEpoch}$ext';
+  final savedPath = p.join(dir.path, fileName);
+
+
+  final savedFile = await File(photo.path).copy(savedPath);
+
+  if (!mounted) return;
+
+  Navigator.of(context).push(
+  MaterialPageRoute(
+  builder: (_) => pages.SavedImagePage(imagePath: savedFile.path),
+  ),
+  );
+  }
+  Future<void> _pickFromGalleryAndSave() async {
+    final XFile? picked = await _picker.pickImage(source: ImageSource.gallery);
+    if (picked == null) return;
+
+    final dir = await getApplicationDocumentsDirectory();
+
+    final ext0 = p.extension(picked.path);
+    final ext = ext0.isNotEmpty ? ext0 : '.jpg';
+
+    final fileName = 'gallery_${DateTime.now().millisecondsSinceEpoch}$ext';
+    final savedPath = p.join(dir.path, fileName);
+
+    final savedFile = await File(picked.path).copy(savedPath);
+
+    if (!mounted) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => pages.SavedImagePage(imagePath: savedFile.path),
+      ),
+    );
   }
 
   @override
@@ -93,7 +148,11 @@ class _HomeScreenState extends State<HomeScreen> {
             size: mid * 0.85,
             text: 'Birder\'s \n Log',
             textHeight: 0.9,
-            onTap: () {},
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const BirdersLogMain())
+              );
+            },
           ),
 
 
@@ -127,7 +186,7 @@ class _HomeScreenState extends State<HomeScreen> {
             left: screenSize.width * 0.10,
             size: mid,
             text: '촬영',
-            onTap: () => print('촬영 클릭!'),
+            onTap: () => _openCameraAndSave(),
           ),
           _buildAnimatedBubbleButton(
             screenSize: screenSize,
@@ -135,7 +194,7 @@ class _HomeScreenState extends State<HomeScreen> {
             left: screenSize.width * 0.50,
             size: mid * 0.85,
             text: '사진 \n 업로드',
-            onTap: () => print('사진 업로드 클릭!'),
+            onTap: () => _pickFromGalleryAndSave(),
           ),
           _buildAnimatedBubbleButton(
             screenSize: screenSize,
