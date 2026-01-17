@@ -135,5 +135,6 @@ REST_FRAMEWORK = {
     ),
 }
 
+# 임시 루트, supabase 연동 시 변경 필요
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'

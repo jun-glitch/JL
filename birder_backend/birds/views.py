@@ -1,12 +1,16 @@
+from django.db.models import Count
+from django.utils import timezone 
+
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
 
-from .models import BirdIdentifySession, BirdCandidate
-from .serializers import BirdCandidateSerializer, BirdIdentifySessionSerializer
+from .models import BirdIdentifySession, BirdCandidate, Photo, Species, Log
+from .serializers import BirdCandidateSerializer, BirdIdentifySessionSerializer, UploadBirdPhotoSerializer, SpeciesSummarySerializer, LogItemSerializer
 from .services.identify import mock_top5_candidates, build_candidates_with_images
+from .utils.geocode import normalize_area_from_latlon
 
 class IdentifyView(APIView):
     permission_classes = [IsAuthenticated]
@@ -103,3 +107,115 @@ class IdentifyAnswerView(APIView):
             "is_finished": False,
         })
 
+class UploadBirdPhotoView(APIView):
+    # ERD 변경시 수정 필요
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = UploadBirdPhotoSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        image = data["image"]
+        lat = data.get("latitude")
+        lon = data.get("longitude")
+        obs_date = data.get("obs_date")
+        species_id = data["species_id"]
+
+        # 종 존재 확인
+        try:
+            species = Species.objects.get(id=species_id)
+        except Species.DoesNotExist:
+            return Response({"detail": "Invalid species_id"}, status=status.HTTP_400_BAD_REQUEST)
+
+        photo = Photo.objects.create(
+            image=image,
+            latitude=lat,
+            longitude=lon,
+            obs_date=obs_date,
+        )
+
+        # 사진 업로드 시점에 정규화
+        location = "UNKNOWN"
+        if lat is not None and lon is not None:
+            try:
+                location = normalize_area_from_latlon(float(lat), float(lon))
+            except Exception:
+                # 역지오코딩 실패해도 업로드 자체는 성공시키고, location만 UNKNOWN으로 -> 되는지 해보고 수정 필요
+                location = "UNKNOWN"
+
+        log = Log.objects.create(
+            user=request.user,
+            photo=photo,
+            species=species,
+            location=location,
+        )
+
+        # supabase 연동 시 수정 필요
+        image_url = request.build_absolute_uri(photo.image.url)
+
+        return Response(
+            {
+                "log_id": log.id,
+                "photo_id": photo.id,
+                "location": location,
+                "image_url": image_url,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+# 지역별 종별 누적 관측 횟수 뷰    
+class AreaSpeciesSummaryView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, area: str):
+        # 예 :"대구광역시"를 넣으면 "대구광역시 중구"도 포함되도록 icontains
+        # 추후 위도 정보 처리 방법에 따라서 수정 필요
+        qs = (
+            Log.objects
+            .filter(location__icontains=area)
+            .values("species_id", "species__common_name", "species__scientific_name")
+            .annotate(total_count=Count("id"))
+            .order_by("-total_count")
+        )
+
+        payload = [
+            {
+                "species_id": row["species_id"],
+                "common_name": row["species__common_name"],
+                "scientific_name": row["species__scientific_name"],
+                "total_count": row["total_count"],
+            }
+            for row in qs
+        ]
+
+        out = SpeciesSummarySerializer(payload, many=True)
+        return Response(out.data, status=status.HTTP_200_OK)
+
+# 특정 지역 + 종의 관측 로그 목록 뷰    
+class AreaSpeciesLogsView(APIView):    
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, area: str, species_id: int):
+        logs = (
+            Log.objects
+            .select_related("photo", "species")
+            .filter(location__icontains=area, species_id=species_id)
+            .order_by("-rec_date")
+        )
+
+        # image_url supabase 연동 시 수정 필요
+        items = []
+        for log in logs:
+            photo = log.photo
+            items.append({
+                "log_id": log.id,
+                "location": log.location,
+                "rec_date": log.rec_date,
+                "obs_date": photo.obs_date,
+                "latitude": float(photo.latitude) if photo.latitude is not None else None,
+                "longitude": float(photo.longitude) if photo.longitude is not None else None,
+                "image_url": request.build_absolute_uri(photo.image.url),
+            })
+
+        out = LogItemSerializer(items, many=True)
+        return Response(out.data, status=status.HTTP_200_OK)

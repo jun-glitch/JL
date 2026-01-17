@@ -30,3 +30,38 @@ class BirdCandidate(models.Model):
 
     def __str__(self):
         return f"Candidate<{self.rank}: {self.common_name_ko}>"
+
+class Species(models.Model):
+    # ERD의 species_code 같은 역할을 Django id가 대신
+    common_name = models.CharField(max_length=100)    
+    scientific_name = models.CharField(max_length=100) 
+    # 위키미디어 대표 이미지 url, 분류(목/과/속/종), 영문명 등 이후에 추가
+
+    def __str__(self):
+        return f"{self.common_name} ({self.scientific_name})"
+
+class Photo(models.Model):
+    # ERD의 photo_num 역할
+    image = models.ImageField(upload_to="uploads/birds/")  # supabase 전환 시 변경 필요
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    obs_date = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Photo<{self.id}>"
+
+
+class Log(models.Model):
+    # ERD의 log.num 역할
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="logs")
+    photo = models.ForeignKey(Photo, on_delete=models.CASCADE, related_name="logs")
+    species = models.ForeignKey(Species, on_delete=models.PROTECT, related_name="logs")
+
+    # 업로드 시점에 정규화된 행정구역 문자열 저장 -> ERD 변경이나, supabase 구조에 따라 조정 가능
+    location = models.CharField(max_length=100, db_index=True)
+
+    rec_date = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Log<{self.id}> {self.user.username} {self.species.common_name}"
