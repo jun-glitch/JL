@@ -6,6 +6,9 @@ from .views import (
     UploadBirdPhotoView,
     AreaSpeciesSummaryView,
     AreaSpeciesLogsView,
+    SpeciesMapPointsView,
+    SpeciesMapRecordsView,
+    ObservationUploadView,
 )   
 
 urlpatterns = [
@@ -21,5 +24,12 @@ urlpatterns = [
     path("areas/<str:area>/species/", AreaSpeciesSummaryView.as_view(), name="area_species_summary"),
     # 특정 지역 + 종의 관측 로그 목록
     path("areas/<str:area>/species/<int:species_id>/logs/", AreaSpeciesLogsView.as_view(), name="area_species_logs"),
+
+    # 종별 지도
+    path("map/points/", SpeciesMapPointsView.as_view(), name="species_map_points"),
+    path("map/records/", SpeciesMapRecordsView.as_view(), name="species_map_records"),
+
+    # 관측 로그 업로드
+    path("observations/upload/", ObservationUploadView.as_view(), name="observation_upload"),
 ]
 

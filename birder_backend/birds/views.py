@@ -1,4 +1,5 @@
 from django.db.models import Count
+from django.db.models.functions import Round
 from django.utils import timezone 
 
 from rest_framework.views import APIView
@@ -6,9 +7,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
+from urllib3 import request
 
 from .models import BirdIdentifySession, BirdCandidate, Photo, Species, Log
-from .serializers import BirdCandidateSerializer, BirdIdentifySessionSerializer, UploadBirdPhotoSerializer, SpeciesSummarySerializer, LogItemSerializer
+from .serializers import BirdCandidateSerializer, BirdIdentifySessionSerializer, UploadBirdPhotoSerializer, SpeciesSummarySerializer, LogItemSerializer, ObservationUploadSerializer 
 from .services.identify import mock_top5_candidates, build_candidates_with_images
 from .utils.geocode import normalize_area_from_latlon
 
@@ -219,3 +221,119 @@ class AreaSpeciesLogsView(APIView):
 
         out = LogItemSerializer(items, many=True)
         return Response(out.data, status=status.HTTP_200_OK)
+
+# 지도 점(소수점 4자리까지 좌표 라운딩) 
+class SpeciesMapPointsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        species_code = request.query_params.get("species_code")
+        start = request.query_params.get("start")
+        end = request.query_params.get("end")
+
+        if not (species_code and start and end):
+            return Response({"detail": "species_code, start, end are required."}, status=400)
+
+        species = Species.objects.filter(species_code=species_code).first()
+        if not species:
+            return Response({"detail": "species not found."}, status=404)
+
+        qs = (
+            Log.objects
+            .filter(species_id=species_code, photo__obs_date__date__range=(start, end))
+            .exclude(photo__latitude__isnull=True)
+            .exclude(photo__longitude__isnull=True)
+            .annotate(
+                grid_lat=Round("photo__latitude", 4),
+                grid_lng=Round("photo__longitude", 4),
+            )
+            .values("grid_lat", "grid_lng")
+            .annotate(count=Count("num"))
+            .order_by("-count")
+        )
+
+        points = [
+            {
+                "grid_lat": float(row["grid_lat"]),
+                "grid_lng": float(row["grid_lng"]),
+                "count": row["count"],
+            }
+            for row in qs
+        ]
+
+        return Response({
+            "species": {
+                "species_code": species.species_code,
+                "common_name": species.common_name,
+                "scientific_name": species.scientific_name,
+            },
+            "start": start,
+            "end": end,
+            "points": points,
+        })
+
+# 특정 격자점의 관측 기록 뷰
+class SpeciesMapRecordsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # 특정 격자점(grid_lat/grid_lng) 클릭 시 해당 격자에 포함된 관측 기록 반환
+        species_code = request.query_params.get("species_code")
+        start = request.query_params.get("start")
+        end = request.query_params.get("end")
+        grid_lat = request.query_params.get("grid_lat")
+        grid_lng = request.query_params.get("grid_lng")
+
+        if not (species_code and start and end and grid_lat and grid_lng):
+            return Response({"detail": "species_code, start, end, grid_lat, grid_lng are required."}, status=400)
+
+        try:
+            grid_lat = float(grid_lat)
+            grid_lng = float(grid_lng)
+        except ValueError:
+            return Response({"detail": "grid_lat/grid_lng must be numbers."}, status=400)
+
+        qs = (
+            Log.objects
+            .filter(species_id=species_code, photo__obs_date__date__range=(start, end))
+            .exclude(photo__latitude__isnull=True)
+            .exclude(photo__longitude__isnull=True)
+            .annotate(
+                grid_lat=Round("photo__latitude", 4),
+                grid_lng=Round("photo__longitude", 4),
+            )
+            .filter(grid_lat=grid_lat, grid_lng=grid_lng)
+            .select_related("photo")
+            .order_by("-photo__obs_date")
+        )
+
+        records = []
+        for log in qs:
+            photo = log.photo
+            records.append({
+                "log_id": log.num,
+                "obs_date": photo.obs_date,
+                "area_full": photo.area_full,
+                "latitude": float(photo.latitude) if photo.latitude is not None else None,
+                "longitude": float(photo.longitude) if photo.longitude is not None else None,
+                "photo_url": photo.image.url if photo.image else None,
+                # photo_url은 supabase 연동 시 수정 필요 
+            })
+
+        return Response({
+            "grid": {"grid_lat": grid_lat, "grid_lng": grid_lng},
+            "records": records,
+        })
+
+class ObservationUploadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    # multipart/form-data 로 받기
+    def post(self, request):
+        serializer = ObservationUploadSerializer(
+            data=request.data,
+            context={"request": request},
+        )
+        serializer.is_valid(raise_exception=True)
+        result = serializer.save()
+        return Response(result, status=status.HTTP_201_CREATED)
