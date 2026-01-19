@@ -66,6 +66,12 @@ flutter:
   assets:
     - assets/images/Birder_logo_bird.png
     - assets/images/location.png
+    - assets/images/birds/Alcedo atthis.webp
+    - assets/images/birds/Gallinula chloropus.jpg
+    - assets/images/birds/Saxicola.webp
+    - assets/images/birds/Sitta europaea.jpg
+    - assets/images/birds/Falco tinnunculus.webp
+    - assets/images/birds/Pandion haliaetus.webp
   # assets:
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg

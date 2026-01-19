@@ -4,8 +4,6 @@ import 'package:birder_frontend/screens/birders_log_area.dart';
 import 'package:birder_frontend/screens/birders_log_species.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:birder_frontend/screens/bird_tile.dart';
-import 'package:birder_frontend/screens/bird_detail_page.dart';
 
 
 class BirdersLogMain extends StatefulWidget {
@@ -20,84 +18,84 @@ class _BirdersLogMainState extends State<BirdersLogMain> {
   @override
   Widget build(BuildContext context) {
 
-  const sky = Color(0xFFDCEBFF); // 연한 하늘색
+    const sky = Color(0xFFDCEBFF); // 연한 하늘색
 
-  return Scaffold(
-    backgroundColor: sky, // 화면 배경색
-    appBar: AppBar(
-      backgroundColor: sky,
-      elevation: 0,
-      toolbarHeight: 100,
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Birder\'s Log',
-            style: GoogleFonts.lobster(
-              fontSize: 35,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-              height: 2.0, // 줄간격
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            '다른 Birder들이 관측한 기록 로그',
-            style: GoogleFonts.jua(
-              fontSize: 18,
-              color: Colors.black87,
-            ),
-          ),
-        ],
-      ),
-    ),
-
-    body: Column(
-      children: [
-        const SizedBox(height: 250),
-        Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+    return Scaffold(
+      backgroundColor: sky, // 화면 배경색
+      appBar: AppBar(
+        backgroundColor: sky,
+        elevation: 0,
+        toolbarHeight: 100,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: _MenuCardButton(
-                label: '지역별로 보기',
-                onTap: () {
-                  Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const BirdersLogArea())
-                  );
-                },
-                iconWidget: Image.asset(
-                  'assets/images/location.png',
-                  width: 115,
-                  height: 115,
-                  fit: BoxFit.contain,
-                ),
+            Text(
+              'Birder\'s Log',
+              style: GoogleFonts.lobster(
+                fontSize: 35,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+                height: 2.0, // 줄간격
               ),
             ),
-            const SizedBox(width: 18),
-            Expanded(
-              child: _MenuCardButton(
-                label: '종별로 보기',
-                onTap: () {
-                  Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const BirdersLogSpecies())
-                  );
-                },
-                iconWidget: Image.asset(
-                  'assets/images/Birder_logo_bird.png',
-                  fit: BoxFit.contain,
-                ),
+            const SizedBox(height: 2),
+            Text(
+              '다른 Birder들이 관측한 기록 로그',
+              style: GoogleFonts.jua(
+                fontSize: 18,
+                color: Colors.black87,
               ),
             ),
           ],
         ),
       ),
-    ],
-    ),
-  );
+
+      body: Column(
+        children: [
+          const SizedBox(height: 250),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: _MenuCardButton(
+                    label: '지역별로 보기',
+                    onTap: () {
+                      Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const BirdersLogArea())
+                      );
+                    },
+                    iconWidget: Image.asset(
+                      'assets/images/location.png',
+                      width: 115,
+                      height: 115,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 18),
+                Expanded(
+                  child: _MenuCardButton(
+                    label: '종별로 보기',
+                    onTap: () {
+                      Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const BirdersLogSpecies())
+                      );
+                    },
+                    iconWidget: Image.asset(
+                      'assets/images/Birder_logo_bird.png',
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
 
   }
 }

@@ -149,7 +149,7 @@ class _BirdersLogSpeciesState extends State<BirdersLogSpecies> {
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
 
               // 3) 결과 영역
               Expanded(
@@ -158,10 +158,75 @@ class _BirdersLogSpeciesState extends State<BirdersLogSpecies> {
                     final hasQuery = _query.trim().isNotEmpty;
                     final hasResults = results.isNotEmpty;
 
-                    // 1) 기본 화면 (인기 검색어, 계절별 새 목록)
+                    // 1) 기본 화면 (계절별 새 목록, 이번주 관측 순위(FE고정))
                     if (!hasQuery) {
-                      // TODO: 검색 전 기본 화면 UI
-                      return const SizedBox.shrink();
+                      return Scaffold(
+                        backgroundColor: sky,
+                        body: SingleChildScrollView(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      '이번 주 관측 순위',
+                                      style: GoogleFonts.jua(fontSize: 24, color: Colors.black),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    const Icon(Icons.emoji_events_outlined, size: 24, color: Colors.black),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+
+                                _RankRow(rank: 1, text: '도요새 (Scolopacidae)'),
+                                _Line(),
+                                _RankRow(rank: 2, text: '울새 (Luscinia sibilans)'),
+                                _Line(),
+                                _RankRow(rank: 3, text: '검은가슴물떼새 (Pluvialis fulva)'),
+                                _Line(),
+
+                                const SizedBox(height: 50),
+
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+
+                                  children: [
+                                    // 제목
+                                    Text(
+                                      '여름철에 볼 수 있는 새',
+                                      style: GoogleFonts.jua(fontSize: 24, color: Colors.black),
+                                    ),
+                                    const SizedBox(height: 16),
+
+                                    // 3 x 2 그리드
+                                    GridView.count(
+                                      crossAxisCount: 3,
+                                      crossAxisSpacing: 15,
+                                      mainAxisSpacing: 15,
+                                      childAspectRatio: 0.72,
+                                      shrinkWrap: true,
+                                      physics: const NeverScrollableScrollPhysics(),
+                                      children: const [
+                                        _SeasonBirdCard(label: '물총새', imagePath: 'assets/images/birds/Alcedo atthis.webp'),
+                                        _SeasonBirdCard(label: '쇠물닭', imagePath: 'assets/images/birds/Gallinula chloropus.jpg'),
+                                        _SeasonBirdCard(label: '검은딱새', imagePath: 'assets/images/birds/Saxicola.webp'),
+                                        _SeasonBirdCard(label: '동고비', imagePath: 'assets/images/birds/Sitta europaea.jpg'),
+                                        _SeasonBirdCard(label: '황조롱이', imagePath: 'assets/images/birds/Falco tinnunculus.webp'),
+                                        _SeasonBirdCard(label: '물수리', imagePath: 'assets/images/birds/Pandion haliaetus.webp'),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+
                     }
 
                     // 3) 검색 결과 없음
@@ -188,6 +253,97 @@ class _BirdersLogSpeciesState extends State<BirdersLogSpecies> {
           ),
         ),
       ),
+    );
+  }
+
+}
+class _RankRow extends StatelessWidget {
+  final int rank;
+  final String text;
+
+  const _RankRow({required this.rank, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          Container(
+            width: 25,
+            height: 25,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              border: Border.all(width: 2, color: Colors.black),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              '$rank',
+              style: GoogleFonts.jua(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Colors.black,
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.jua(fontSize: 20, color: Colors.black),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Line extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 1.0,
+      width: double.infinity,
+      color: const Color(0xFF8CB6FF),
+    );
+  }
+}
+
+class _SeasonBirdCard extends StatelessWidget {
+  final String label;
+  final String imagePath;
+
+  const _SeasonBirdCard({
+    required this.label,
+    required this.imagePath,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AspectRatio(
+          aspectRatio: 1,
+          child: ClipRRect(
+            child: Image.asset(
+              imagePath,
+              fit: BoxFit.cover,
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 10),
+
+        Text(
+          label,
+          style: GoogleFonts.jua(
+            fontSize: 20,
+            color: Colors.black,
+          ),
+        ),
+      ],
     );
   }
 }
