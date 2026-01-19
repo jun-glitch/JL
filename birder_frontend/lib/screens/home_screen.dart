@@ -2,13 +2,14 @@ import 'dart:io';
 
 import 'package:birder_frontend/screens/birders_log_main.dart';
 import 'package:birder_frontend/screens/log_in.dart';
+import 'package:birder_frontend/screens/member_info_pages.dart';
 import 'package:birder_frontend/screens/my_log.dart';
-import 'package:birder_frontend/screens/sign_up.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart'  as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'saved_image_page.dart' as pages;
 
 class HomeScreen extends StatefulWidget {
@@ -94,15 +95,6 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: IconButton(
-              iconSize: 30,
-              icon: const Icon(Icons.person),
-              onPressed: () {
-                Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const LoginPage())
-                );
-              },
-            ),
           ),
         ],
       ),
@@ -156,15 +148,51 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
 
 
-          // 설정
+          // 계정
           _buildBubbleButton(
             screenSize: screenSize,
             top: screenSize.height * 0.45,
             left: screenSize.width * 0.72,
             size: small,
-            text: '설정',
+            text: '계정',
             textHeight: 1.0,
-            onTap: () => print('설정 클릭!'),
+            onTap: () async {
+              final prefs = await SharedPreferences.getInstance();
+              final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+
+              if (!context.mounted) return;
+
+              if (!isLoggedIn) {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const LoginPage()),
+                );
+              }
+              else{
+                final username = (prefs.getString('username') ?? '').trim();
+                final email = (prefs.getString('email') ?? '').trim();
+                final name = (prefs.getString('name') ?? '').trim();
+
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => MemberInfoPage(
+                      username: username,
+                      email: email,
+                      name: name,
+                      onLogout: () async {
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setBool('isLoggedIn', false);
+                        await prefs.remove('username');
+                        await prefs.remove('email');
+                        await prefs.remove('name');
+                      },
+                      onDeleteAccount: () async {
+                        // TODO: 탈퇴 API 호출
+                      },
+                    ),
+                  ),
+                );
+              }
+            },
           ),
 
           // 새 검색 (메인 버튼)

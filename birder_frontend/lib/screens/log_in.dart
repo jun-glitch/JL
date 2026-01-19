@@ -1,8 +1,10 @@
 import 'package:birder_frontend/screens/find_id.dart';
 import 'package:birder_frontend/screens/find_password.dart';
-import 'package:birder_frontend/screens/member_info_page.dart';
+import 'package:birder_frontend/screens/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 
 import 'sign_up.dart';
 
@@ -17,10 +19,15 @@ class _LoginPageState extends State<LoginPage> {
   final _idCtrl = TextEditingController();
   final _pwCtrl = TextEditingController();
 
+  final _emailCtrl = TextEditingController();
+  final _nameCtrl = TextEditingController();
+
   @override
   void dispose() {
     _idCtrl.dispose();
     _pwCtrl.dispose();
+    _emailCtrl.dispose();
+    _nameCtrl.dispose();
     super.dispose();
   }
 
@@ -129,24 +136,21 @@ class _LoginPageState extends State<LoginPage> {
                             borderRadius: BorderRadius.circular(14),
                           ),
                         ),
-                        onPressed: () {
-                          Navigator.of(context).pushReplacement(
-                            MaterialPageRoute(
-                              builder: (_) => MemberInfoPage(
-                                // TODO : 데이터베이스 연결
-                                userId: _idCtrl.text.trim(),
-                                email: 'user@example.com',
-                                name: '홍길동',
-                                onLogout: () async {
-                                  // TODO: 토큰 삭제 등
-                                },
-                                onDeleteAccount: () async {
-                                  // TODO: 탈퇴 API 호출
-                                },
-                              ),
-                            ),
-                          );
+                        onPressed: () async {
+                          final prefs = await SharedPreferences.getInstance();
 
+                          // 로그인 성공 가정
+                          await prefs.setBool('isLoggedIn', true);
+                          await prefs.setString('username', _idCtrl.text.trim());
+                          await prefs.setString('email', _emailCtrl.text.trim());
+                          await prefs.setString('name', _nameCtrl.text.trim());
+
+                          if (!context.mounted) return;
+
+                          // 메인 화면으로 이동
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(builder: (_) => const HomeScreen()),
+                          );
                         },
                         child: const Text(
                           '로그인',

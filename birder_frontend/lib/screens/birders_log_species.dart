@@ -181,11 +181,11 @@ class _BirdersLogSpeciesState extends State<BirdersLogSpecies> {
                                 ),
                                 const SizedBox(height: 8),
 
-                                _RankRow(rank: 1, text: '도요새 (Scolopacidae)'),
+                                _RankRow(rank: 1, text: '흰뺨검둥오리 (Anas zonorhyncha)'),
                                 _Line(),
-                                _RankRow(rank: 2, text: '울새 (Luscinia sibilans)'),
+                                _RankRow(rank: 2, text: '까치 (Pica serica)'),
                                 _Line(),
-                                _RankRow(rank: 3, text: '검은가슴물떼새 (Pluvialis fulva)'),
+                                _RankRow(rank: 3, text: '쇠백로 (Egretta garzetta)'),
                                 _Line(),
 
                                 const SizedBox(height: 50),
@@ -245,7 +245,8 @@ class _BirdersLogSpeciesState extends State<BirdersLogSpecies> {
                     // 2) 검색 결과 있음
                     // TODO: 검색 결과 UI
                     return const SizedBox.shrink();
-                  },
+
+                  }
                 ),
               ),
 
