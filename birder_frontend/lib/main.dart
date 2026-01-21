@@ -10,15 +10,16 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const brand = const Color(0xFFA1C4FD);
+
     return MaterialApp(
       title: 'Birder',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor:const Color(0xFF7499D0),
-        ), // 여기 바꾸면 Stepper 색도 같이 바뀜
         useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(seedColor: brand),
       ),
       home: const HomeScreen(),
     );
+
   }
 }

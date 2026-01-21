@@ -113,7 +113,7 @@ class _SignupStepperPageState extends State<SignupStepperPage> {
     final formState = _formKeys[_currentStep].currentState;
     final isValid = formState?.validate() ?? false;
 
-    // 3단계는 validate + 약관체크까지해야 제출
+
     if (_currentStep == 2) {
       if (!_agreeTerms || !_agreePrivacy) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -152,13 +152,20 @@ class _SignupStepperPageState extends State<SignupStepperPage> {
   @override
   Widget build(BuildContext context) {
     const sky = Color(0xFFDCEBFF);
+    const stepColor = Color(0xFFA1C4FD);
     return Scaffold(
       backgroundColor: sky,
       appBar: AppBar(
           backgroundColor: sky,
           title: const Text('회원가입')
       ),
-      body: Stepper(
+        body: Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+              primary: stepColor,
+            ),
+          ),
+      child: Stepper(
         type: StepperType.vertical,
         currentStep: _currentStep,
         onStepContinue: _goNext,
@@ -252,20 +259,59 @@ class _SignupStepperPageState extends State<SignupStepperPage> {
                       return null;
                     },
                   ),
-                  TextFormField(
-                    controller: _emailCtrl,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      labelText: '이메일',
-                      hintText: 'name@example.com',
-                    ),
-                    validator: (v) {
-                      final value = (v ?? '').trim();
-                      if (value.isEmpty) return '이메일을 입력해 주세요.';
-                      final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
-                      if (!emailRegex.hasMatch(value)) return '이메일 형식이 올바르지 않습니다.';
-                      return null;
-                    },
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _emailCtrl,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: const InputDecoration(
+                            labelText: '이메일',
+                            hintText: 'name@example.com',
+                          ),
+                          validator: (v) {
+                            final value = (v ?? '').trim();
+                            if (value.isEmpty) return '이메일을 입력해 주세요.';
+                            final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
+                            if (!emailRegex.hasMatch(value)) return '이메일 형식이 올바르지 않습니다.';
+                            return null;
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      SizedBox(
+                        height: 40,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            final email = _emailCtrl.text.trim();
+                            final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
+
+                            if (email.isEmpty || !emailRegex.hasMatch(email)) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('올바른 이메일을 먼저 입력해 주세요.')),
+                              );
+                              return;
+                            }
+
+                            // TODO: 이메일 인증 API 호출
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('인증 메일 발송 요청! (TODO: 서버 연동)')),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFA1C4FD),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            elevation: 0,
+                          ),
+                          child: const Text('인증'),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -303,6 +349,7 @@ class _SignupStepperPageState extends State<SignupStepperPage> {
           ),
         ],
       ),
+    ),
     );
   }
 }
