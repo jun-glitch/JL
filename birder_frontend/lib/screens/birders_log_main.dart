@@ -42,7 +42,9 @@ class _BirdersLogMainState extends State<BirdersLogMain> {
             const SizedBox(height: 2),
             Text(
               '다른 Birder들이 관측한 기록 로그',
-              style: GoogleFonts.jua(
+              style: TextStyle(
+                fontFamily: 'NotoSansKR',
+                fontWeight: FontWeight.w700,
                 fontSize: 18,
                 color: Colors.black87,
               ),
@@ -140,7 +142,9 @@ class _MenuCardButton extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               label,
-              style: GoogleFonts.jua(
+              style: TextStyle(
+                fontFamily: 'NotoSansKR',
+                fontWeight: FontWeight.w500,
                 fontSize: 25,
                 color: Colors.black,
               ),

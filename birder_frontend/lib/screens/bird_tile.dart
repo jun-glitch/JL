@@ -26,7 +26,7 @@ class BirdTile extends StatelessWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: Container(
-                color: Colors.grey.shade300, // ✅ 회색 상자
+                color: Colors.grey.shade300, // 회색 상자
                 alignment: Alignment.center,
                 child: canOpen
                     ? const Icon(Icons.check_circle_outline) // 발견 표시(선택)

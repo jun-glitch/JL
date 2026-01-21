@@ -1,3 +1,4 @@
+import 'package:birder_frontend/screens/birders_log_area_result.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -129,7 +130,7 @@ class _BirdersLogAreaState extends State<BirdersLogArea> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
             Row(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize: MainAxisSize.max,
             children: [
               Transform.translate(
                 offset: const Offset(0, -3),
@@ -151,8 +152,30 @@ class _BirdersLogAreaState extends State<BirdersLogArea> {
                   color: Colors.black,
                 ),
               ),
+              const Spacer(), // 임시 버튼 (DB + 로그 연결 후 삭제)
+              SizedBox(
+                height: 34,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const BirdersLogAreaResult()),
+                    );
+                  },
+                  child: Text(
+                    '임시',
+                    style: GoogleFonts.jua(fontSize: 16),
+                  ),
+                ),
+              ),
             ],
           ),
+
 
               const SizedBox(height: 12),
 
