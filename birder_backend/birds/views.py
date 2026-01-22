@@ -1,6 +1,9 @@
+import uuid
+
 from django.db.models import Count
 from django.db.models.functions import Round
-from django.utils import timezone 
+from django.utils import timezone
+from django.conf import settings
 
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
@@ -13,6 +16,7 @@ from .models import BirdIdentifySession, BirdCandidate, Photo, Species, Log
 from .serializers import BirdCandidateSerializer, BirdIdentifySessionSerializer, UploadBirdPhotoSerializer, SpeciesSummarySerializer, LogItemSerializer, ObservationUploadSerializer 
 from .services.identify import mock_top5_candidates, build_candidates_with_images
 from .utils.geocode import normalize_area_from_latlon
+from integrations.supabase_client import supabase
 
 class IdentifyView(APIView):
     permission_classes = [IsAuthenticated]
@@ -22,9 +26,33 @@ class IdentifyView(APIView):
         image = request.FILES.get("image")
         if not image:
             return Response({"detail": "image file required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # 1-2) supabase storage에 이미지파일 저장
+        try:
+            file_ext = image.name.split('.')[-1]
+            file_name = f"{uuid.uuid4()}.{file_ext}"
+            
+            # 파일을 바이너리로 읽기
+            file_content = image.read()
+            
+            # Supabase Storage에 업로드
+            # .upload(경로, 파일데이터, 옵션)
+            storage_response = supabase.storage.from_(settings.SUPABASE_STORAGE_BUCKET).upload(
+                path=file_name,
+                file=file_content,
+                file_options={"content-type": image.content_type}
+            )
+
+            # 업로드된 파일의 Public URL 가져오기
+            image_url = supabase.storage.from_(settings.SUPABASE_STORAGE_BUCKET).get_public_url(file_name)
+        except Exception as e:
+            return Response({"detail" : f"Storage upload failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        # 1-3) 이미지에서 위치정보(latitude, longitude) 추출
+        
 
         # 2) 식별 세션 생성
-        session = BirdIdentifySession.objects.create(user=request.user, image=image)
+        session = BirdIdentifySession.objects.create(user=request.user, image_url=image_url)
 
         # 3) Top5 후보 생성(현재 mock -> 추후 Chat-GPT API 연동 예정)
         top5 = mock_top5_candidates()
@@ -122,7 +150,7 @@ class UploadBirdPhotoView(APIView):
         lat = data.get("latitude")
         lon = data.get("longitude")
         obs_date = data.get("obs_date")
-        species_id = data["species_id"]
+        species_id = data["species_code"]
 
         # 종 존재 확인
         try:
@@ -137,6 +165,8 @@ class UploadBirdPhotoView(APIView):
             obs_date=obs_date,
         )
 
+        """
+        location column 삭제 수정일자 26.01.22
         # 사진 업로드 시점에 정규화
         location = "UNKNOWN"
         if lat is not None and lon is not None:
@@ -146,11 +176,12 @@ class UploadBirdPhotoView(APIView):
                 # 역지오코딩 실패해도 업로드 자체는 성공시키고, location만 UNKNOWN으로 -> 되는지 해보고 수정 필요
                 location = "UNKNOWN"
 
+        """
         log = Log.objects.create(
             user=request.user,
             photo=photo,
             species=species,
-            location=location,
+            # location=location,
         )
 
         # supabase 연동 시 수정 필요
@@ -160,7 +191,7 @@ class UploadBirdPhotoView(APIView):
             {
                 "log_id": log.id,
                 "photo_id": photo.id,
-                "location": location,
+                # "location": location,
                 "image_url": image_url,
             },
             status=status.HTTP_201_CREATED,

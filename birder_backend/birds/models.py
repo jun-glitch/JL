@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 # 새 식별 세션 : 사용자가 새 사진을 올리고 후보군을 받아보는 세션 기록용(한 번 식별 시도할 때마다 하나의 세션 생성)
 class BirdIdentifySession(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="identify_sessions")
-    image = models.ImageField(upload_to="identify/")  # 사용자가 업로드한 새 사진
+    image_url = models.ImageField(upload_to="identify/")  # 사용자가 업로드한 새 사진
     current_index = models.IntegerField(default=0)    # 지금 몇 번째 후보를 보고 있는지(0~4)
     is_finished = models.BooleanField(default=False)  # 식별 완료 여부
     selected_candidate = models.ForeignKey(
