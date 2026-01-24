@@ -30,14 +30,15 @@ def get_decimal_from_dms(dms, ref):
         return -float(degrees + minutes + seconds)
     return float(degrees + minutes + seconds)
 
-# 이미지에서 위치정보 추출하는 함수
-def extract_exif_location(image_file):
+# 이미지에서 위치정보&날짜정보 추출하는 함수
+def extract_exif_data(image_file):
+    lat, lng, obs_date = None, None, None
     try:
         # 이미지 열기
         img = Image.open(image_file)
         exif_data = img._getexif()
         if not exif_data:
-            return None, None
+            return lat, lng, obs_date
 
         gps_info = {}
         for tag, value in exif_data.items():
@@ -65,7 +66,7 @@ class IdentifyView(APIView):
             return Response({"detail": "image file required"}, status=status.HTTP_400_BAD_REQUEST)
         
         # 1-1) 이미지에서 위치정보 추출
-        lat, lng = extract_exif_location(image)
+        lat, lng = extract_exif_data(image)
         image.seek(0)
 
         # 1-2) supabase storage에 이미지파일 저장 및 photo 테이블에 사진 내용 저장
@@ -100,7 +101,7 @@ class IdentifyView(APIView):
         
 
         # 2) 식별 세션 생성
-        session = BirdIdentifySession.objects.create(user=request.user, image_url=image_url)
+        session = BirdIdentifySession.objects.create(user=request.user, image_url=image_url, db_data = db_res.data)
 
         # 3) Top5 후보 생성(현재 mock -> 추후 Chat-GPT API 연동 예정)
         top5 = mock_top5_candidates()
