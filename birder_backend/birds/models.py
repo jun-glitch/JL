@@ -62,6 +62,9 @@ class Species(models.Model):
     species_code = models.BigAutoField(primary_key=True)
     common_name = models.CharField(max_length=100)
     scientific_name = models.CharField(max_length=100)
+    order = models.CharField(max_length=100)
+    family_name = models.CharField(max_length=100)
+    detail = models.CharField(max_length=255)
 
     def __str__(self):
         return f"{self.common_name}({self.scientific_name})"
@@ -92,9 +95,9 @@ class Log(models.Model):
     photo = models.ForeignKey(Photo, on_delete=models.CASCADE, related_name='logs')
     species = models.ForeignKey(Species, on_delete=models.SET_NULL, null=True, blank=True, related_name='logs')
 
-    location = models.CharField(max_length=120, db_index=True, blank=True, default="")  # 역지오코딩된 위치명
+    # location = models.CharField(max_length=120, db_index=True, blank=True, default="")  # 역지오코딩된 위치명
 
-    rec_date = models.DateTimeField(auto_now_add=True)
+    reg_date = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"Log<{self.num}> user={self.user_id} species={self.species_id}"
