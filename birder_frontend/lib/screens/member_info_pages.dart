@@ -1,3 +1,4 @@
+import 'package:birder_frontend/screens/change_password.dart';
 import 'package:birder_frontend/screens/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -92,7 +93,11 @@ class MemberInfoPage extends StatelessWidget {
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  onPressed: onChangePassword ?? () {},
+                  onPressed: onChangePassword ?? () {
+                    Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const VerifyPasswordPage()),
+                  );
+                  },
                   child: Text(
                     '비밀번호 변경',
                     style: GoogleFonts.jua(
