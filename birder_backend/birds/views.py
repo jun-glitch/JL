@@ -18,6 +18,43 @@ from .services.identify import mock_top5_candidates, build_candidates_with_image
 from .utils.geocode import normalize_area_from_latlon
 from integrations.supabase_client import supabase
 
+from PIL import Image
+from PIL.ExifTags import TAGS, GPSTAGS
+
+# EXIF에서 위도/경도를 실수형으로 변환하는 헬퍼 함수
+def get_decimal_from_dms(dms, ref):
+    degrees = dms[0]
+    minutes = dms[1] / 60.0
+    seconds = dms[2] / 3600.0
+    if ref in ['S', 'W']:
+        return -float(degrees + minutes + seconds)
+    return float(degrees + minutes + seconds)
+
+# 이미지에서 위치정보 추출하는 함수
+def extract_exif_location(image_file):
+    try:
+        # 이미지 열기
+        img = Image.open(image_file)
+        exif_data = img._getexif()
+        if not exif_data:
+            return None, None
+
+        gps_info = {}
+        for tag, value in exif_data.items():
+            decoded = TAGS.get(tag, tag)
+            if decoded == "GPSInfo":
+                for t in value:
+                    sub_tag = GPSTAGS.get(t, t)
+                    gps_info[sub_tag] = value[t]
+
+        if "GPSLatitude" in gps_info and "GPSLatitudeRef" in gps_info:
+            lat = get_decimal_from_dms(gps_info["GPSLatitude"], gps_info["GPSLatitudeRef"])
+            lng = get_decimal_from_dms(gps_info["GPSLongitude"], gps_info["GPSLongitudeRef"])
+            return lat, lng
+    except Exception as e:
+        print(f"EXIF 추출 에러: {e}")
+    return None, None
+
 class IdentifyView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -27,7 +64,11 @@ class IdentifyView(APIView):
         if not image:
             return Response({"detail": "image file required"}, status=status.HTTP_400_BAD_REQUEST)
         
-        # 1-2) supabase storage에 이미지파일 저장
+        # 1-1) 이미지에서 위치정보 추출
+        lat, lng = extract_exif_location(image)
+        image.seek(0)
+
+        # 1-2) supabase storage에 이미지파일 저장 및 photo 테이블에 사진 내용 저장
         try:
             file_ext = image.name.split('.')[-1]
             file_name = f"{uuid.uuid4()}.{file_ext}"
@@ -45,10 +86,17 @@ class IdentifyView(APIView):
 
             # 업로드된 파일의 Public URL 가져오기
             image_url = supabase.storage.from_(settings.SUPABASE_STORAGE_BUCKET).get_public_url(file_name)
+
+            photo_data = {
+                "s_fileNum" : image_url,
+                "latitude" : lat,
+                "longitude" : lng,
+                "obs_date" : ""
+            }
+        
+            db_res = supabase.table("photo").insert(photo_data).execute()
         except Exception as e:
             return Response({"detail" : f"Storage upload failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
-        # 1-3) 이미지에서 위치정보(latitude, longitude) 추출
         
 
         # 2) 식별 세션 생성
