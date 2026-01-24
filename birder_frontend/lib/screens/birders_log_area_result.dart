@@ -347,7 +347,7 @@ class _BirdersLogAreaResultState extends State<BirdersLogAreaResult> {
                     Expanded(
                       child: Center(
                         child: Text(
-                          '관측 일자',
+                          '관측/등록 일자',
                           style: TextStyle(
                             fontFamily: 'Paperlogy',
                             fontWeight: FontWeight.w700,
