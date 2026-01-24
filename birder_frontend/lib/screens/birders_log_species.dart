@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:birder_frontend/screens/birders_log_species_result.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -40,8 +38,7 @@ class _BirdersLogSpeciesState extends State<BirdersLogSpecies> {
         .where((s) => s.toLowerCase().contains(_query.trim().toLowerCase()))
         .toList();
 
-    final bool hasQuery = _query.trim().isNotEmpty;
-    final bool hasResults = results.isNotEmpty;
+
 
     return Scaffold(
       backgroundColor: sky,

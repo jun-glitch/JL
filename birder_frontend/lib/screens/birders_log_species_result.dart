@@ -14,7 +14,6 @@ class BirdersLogSpeciesResult extends StatefulWidget {
 }
 
 class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
-  final TextEditingController _searchCtrl = TextEditingController();
 
   DateTime? _startDate;
   DateTime? _endDate;
@@ -124,7 +123,6 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
     defaultPolylineColor: const Color(0xFFA1C4FD),
     defaultPolylineStroke: 1.2,
   );
-  bool _outlineLoaded = false;
 
 
   // 대한민국 범위(지도 밖으로 못 나가게 제한)

@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:birder_frontend/screens/birders_log_area.dart';
 import 'package:birder_frontend/screens/birders_log_species.dart';
 import 'package:flutter/material.dart';

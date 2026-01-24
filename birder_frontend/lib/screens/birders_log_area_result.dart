@@ -1,11 +1,5 @@
-import 'package:birder_frontend/screens/birders_log_area.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
-import 'package:flutter_map/flutter_map.dart';
-import 'package:flutter_map_geojson/flutter_map_geojson.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:latlong2/latlong.dart';
 
 
 class BirdersLogAreaResult extends StatefulWidget {
@@ -16,7 +10,6 @@ class BirdersLogAreaResult extends StatefulWidget {
 }
 
 class _BirdersLogAreaResultState extends State<BirdersLogAreaResult> {
-  final TextEditingController _searchCtrl = TextEditingController();
 
   String _fmtDate(DateTime dt) {
     final m = dt.month.toString().padLeft(2, '0');

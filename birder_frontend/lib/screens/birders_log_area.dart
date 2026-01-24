@@ -26,7 +26,6 @@ class SpeciesCount {
 
 
 class _BirdersLogAreaState extends State<BirdersLogArea> {
-  final TextEditingController _searchCtrl = TextEditingController();
 
   final Map<String, List<String>> regionMap = {
     '서울': ['강남구', '강동구', '강북구', '강서구', '관악구', '광진구', '구로구', '금천구', '노원구', '도봉구',
@@ -74,14 +73,7 @@ class _BirdersLogAreaState extends State<BirdersLogArea> {
     super.dispose();
   }
 
-  // 임시 리스트
-  final List<String> _allSpecies = const [
-    '참새',
-    '까치',
-    '비둘기',
-    '직박구리',
-    '까마귀',
-  ];
+
 
   @override
   Widget build(BuildContext context) {
