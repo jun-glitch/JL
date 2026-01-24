@@ -1,3 +1,5 @@
+import 'package:birder_frontend/screens/birders_log_area.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_map/flutter_map.dart';
@@ -15,6 +17,20 @@ class BirdersLogAreaResult extends StatefulWidget {
 
 class _BirdersLogAreaResultState extends State<BirdersLogAreaResult> {
   final TextEditingController _searchCtrl = TextEditingController();
+
+  String _fmtDate(DateTime dt) {
+    final m = dt.month.toString().padLeft(2, '0');
+    final d = dt.day.toString().padLeft(2, '0');
+    return '${dt.year}.$m.$d';
+  }
+
+  String _fmtTime(DateTime dt) {
+    final hh = dt.hour.toString().padLeft(2, '0');
+    final mm = dt.minute.toString().padLeft(2, '0');
+    final ss = dt.second.toString().padLeft(2, '0');
+    return '$hh:$mm:$ss';
+  }
+
 
   DateTime? _startDate;
   DateTime? _endDate;
@@ -36,14 +52,15 @@ class _BirdersLogAreaResultState extends State<BirdersLogAreaResult> {
     return '$y/$m/$day';
   }
 
-  String _resolveSpeciesName(BuildContext context) {
+
+  String _resolveAreaName(BuildContext context) {
 
     // 이전 화면에서 arguments로 넘겨준 값 사용
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args is String && args.trim().isNotEmpty) return args.trim();
 
     // 임시 기본값
-    return '도요새';
+    return '대구광역시';
   }
 
   Future<void> _pickStartDate() async {
@@ -101,7 +118,12 @@ class _BirdersLogAreaResultState extends State<BirdersLogAreaResult> {
             Expanded(
               child: Text(
                 text,
-                style: GoogleFonts.jua(fontSize: 18, color: Colors.black87),
+                style: TextStyle(
+                    fontFamily: 'Paperlogy',
+                    fontWeight: FontWeight.w500,
+                    fontSize: 16,
+                    color: Colors.black87
+                ),
               ),
             ),
             const Icon(Icons.calendar_month_outlined, size: 24),
@@ -137,7 +159,9 @@ class _BirdersLogAreaResultState extends State<BirdersLogAreaResult> {
             const SizedBox(height: 2),
             Text(
               '다른 Birder들이 관측한 기록 로그',
-              style: GoogleFonts.jua(
+              style: TextStyle(
+                fontFamily: 'Paperlogy',
+                fontWeight: FontWeight.w700,
                 fontSize: 18,
                 color: Colors.black87,
               ),
@@ -169,19 +193,34 @@ class _BirdersLogAreaResultState extends State<BirdersLogAreaResult> {
                   const SizedBox(width: 13),
                   Text(
                     '지역별로 보기',
-                    style: GoogleFonts.jua(
+                    style: TextStyle(
+                      fontFamily: 'Paperlogy',
+                      fontWeight: FontWeight.w500,
                       fontSize: 27,
-                      fontWeight: FontWeight.w400,
                       color: Colors.black,
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 14),
+              // (종명) 지역별 누적 관측 기록
+              Center(
+                child: Text(
+                  '${_resolveAreaName(context)} 상세 관측 기록',
+                    style: TextStyle(
+                    fontFamily: 'Paperlogy',
+                    fontWeight: FontWeight.w500,
+                    fontSize: 24,
+                    color: Colors.black,
+                  ),
+                ),
               ),
 
               const SizedBox(height: 12),
 
               // 날짜 선택 달력칸
               Container(
+                width: double.infinity,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(14),
@@ -191,13 +230,15 @@ class _BirdersLogAreaResultState extends State<BirdersLogAreaResult> {
                   ),
                 ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Padding(
                       padding: const EdgeInsets.only(left: 6),
                       child: Text(
                         '검색 기간',
-                        style: GoogleFonts.jua(
+                        style: TextStyle(
+                          fontFamily: 'Paperlogy',
+                          fontWeight: FontWeight.w500,
                           fontSize: 20,
                           color: Colors.black87,
                         ),
@@ -217,7 +258,10 @@ class _BirdersLogAreaResultState extends State<BirdersLogAreaResult> {
                         const SizedBox(width: 10),
                         Text(
                           '~',
-                          style: GoogleFonts.jua(fontSize: 16),
+                          style: TextStyle(
+                              fontFamily: 'Paperlogy',
+                              fontWeight: FontWeight.w400,
+                              fontSize: 16),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -228,13 +272,13 @@ class _BirdersLogAreaResultState extends State<BirdersLogAreaResult> {
                         ),
                       ],
                     ),
+
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
 
-
-
+              const SizedBox(height: 20),
+              _buildLogTable(),
 
             ],
           ),
@@ -242,5 +286,178 @@ class _BirdersLogAreaResultState extends State<BirdersLogAreaResult> {
       ),
     );
   }
+  Widget _buildLogTable({double height = 420}) {
+    if (_loadingLogs) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_logError != null) {
+      return Text(
+        _logError!,
+        style: const TextStyle(
+          fontFamily: 'Paperlogy',
+          fontWeight: FontWeight.w400,
+          fontSize: 15,
+          color: Colors.redAccent,
+        ),
+      );
+    }
+
+    if (_logs.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.7),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.7),
+          width: 1.5,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+            children: [
+              // 헤더
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Row(
+                  children: const [
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          '관측 위치',
+                          style: TextStyle(
+                            fontFamily: 'Paperlogy',
+                            fontWeight: FontWeight.w700,
+                            fontSize: 20,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          '관측 일자',
+                          style: TextStyle(
+                            fontFamily: 'Paperlogy',
+                            fontWeight: FontWeight.w700,
+                            fontSize: 20,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // 헤더 아래 굵은 라인(사진처럼)
+              const Divider(height: 1, thickness: 1.2, color: Colors.black54),
+
+              // 본문(스크롤)
+              SizedBox(
+                height: height,
+                child: ListView.separated(
+                  itemCount: _logs.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 6),
+                  itemBuilder: (context, i) {
+                    final log = _logs[i];
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Center(
+                              child: Text(
+                                log.location,
+                                style: const TextStyle(
+                                  fontFamily: 'Paperlogy',
+                                  fontWeight: FontWeight.w400,
+                                  fontSize: 16,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _fmtDate(log.observedAt),
+                                    style: const TextStyle(
+                                      fontFamily: 'Paperlogy',
+                                      fontWeight: FontWeight.w400,
+                                      fontSize: 14,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _fmtTime(log.observedAt),
+                                    style: const TextStyle(
+                                      fontFamily: 'Paperlogy',
+                                      fontWeight: FontWeight.w400,
+                                      fontSize: 14,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+  }
 
 }
+class ObservationLog {
+  final String location;    // 위도 경도
+  final DateTime observedAt;
+
+  ObservationLog({
+    required this.location,
+    required this.observedAt,
+  });
+
+  factory ObservationLog.fromJson(Map<String, dynamic> json) {
+    return ObservationLog(
+      location: json['location'] as String,
+      observedAt: DateTime.parse(json['observed_at'] as String),
+    );
+  }
+}
+
+bool _loadingLogs = false;
+String? _logError;
+List<ObservationLog> _logs = [
+  ObservationLog(location: '35°N 128°E', observedAt: DateTime(2025, 10, 17, 16, 34, 23)),
+  ObservationLog(location: '35°N 128°E', observedAt: DateTime(2025, 10, 17, 11, 34, 23)),
+  ObservationLog(location: '35°N 128°E', observedAt: DateTime(2025, 10, 16,  9, 34, 23)),
+  ObservationLog(location: '35°N 128°E', observedAt: DateTime(2025, 10, 14, 15, 34, 23)),
+  ObservationLog(location: '35°N 128°E', observedAt: DateTime(2025, 10, 14, 10, 34, 23)),
+  ObservationLog(location: '35°N 128°E', observedAt: DateTime(2025, 10, 11, 12, 34, 23)),
+  ObservationLog(location: '35°N 128°E', observedAt: DateTime(2025, 10, 10,  7, 34, 23)),
+  ObservationLog(location: '35°N 128°E', observedAt: DateTime(2025, 10,  6, 22, 34, 23)),
+  ObservationLog(location: '35°N 128°E', observedAt: DateTime(2025, 10,  6, 18, 34, 23)),
+  ObservationLog(location: '35°N 128°E', observedAt: DateTime(2025, 10,  3, 10, 34, 23)),
+];

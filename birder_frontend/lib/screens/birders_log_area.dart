@@ -113,7 +113,9 @@ class _BirdersLogAreaState extends State<BirdersLogArea> {
             const SizedBox(height: 2),
             Text(
               '다른 Birder들이 관측한 기록 로그',
-              style: GoogleFonts.jua(
+              style: TextStyle(
+                fontFamily: 'Paperlogy',
+                fontWeight: FontWeight.w700,
                 fontSize: 18,
                 color: Colors.black87,
               ),
@@ -146,9 +148,10 @@ class _BirdersLogAreaState extends State<BirdersLogArea> {
               const SizedBox(width: 13),
               Text(
                 '지역별로 보기',
-                style: GoogleFonts.jua(
+                style: TextStyle(
+                  fontFamily: 'Paperlogy',
+                  fontWeight: FontWeight.w500,
                   fontSize: 27,
-                  fontWeight: FontWeight.w400,
                   color: Colors.black,
                 ),
               ),
@@ -169,7 +172,11 @@ class _BirdersLogAreaState extends State<BirdersLogArea> {
                   },
                   child: Text(
                     '임시',
-                    style: GoogleFonts.jua(fontSize: 16),
+                    style: TextStyle(
+                        fontFamily: 'Paperlogy',
+                        fontWeight: FontWeight.w400,
+                        fontSize: 16
+                    ),
                   ),
                 ),
               ),
@@ -294,7 +301,11 @@ class _BirdersLogAreaState extends State<BirdersLogArea> {
                 selectedDistrict == null
                     ? '누적 관측 요약'
                     : '$selectedRegion $selectedDistrict 누적 관측',
-                style: GoogleFonts.jua(fontSize: 23, color: Colors.black87),
+                style: TextStyle(
+                    fontFamily: 'Paperlogy',
+                    fontWeight: FontWeight.w400,
+                    fontSize: 23,
+                    color: Colors.black87),
               ),
 
               const SizedBox(height: 10),
@@ -364,7 +375,11 @@ class _BirdersLogAreaState extends State<BirdersLogArea> {
         ),
         child: Text(
           '오른쪽에서 지역을 선택하면 누적 관측 표가 보여요.',
-          style: GoogleFonts.jua(fontSize: 15, color: Colors.black87),
+          style: TextStyle(
+              fontFamily: 'Paperlogy',
+              fontWeight: FontWeight.w400,
+              fontSize: 15,
+              color: Colors.black87),
         ),
       );
     }
@@ -379,7 +394,11 @@ class _BirdersLogAreaState extends State<BirdersLogArea> {
     if (_summaryError != null) {
       return Text(
         _summaryError!,
-        style: GoogleFonts.jua(fontSize: 15, color: Colors.redAccent),
+        style: TextStyle(
+            fontFamily: 'Paperlogy',
+            fontWeight: FontWeight.w400,
+            fontSize: 15,
+            color: Colors.redAccent),
       );
     }
 
@@ -396,12 +415,14 @@ class _BirdersLogAreaState extends State<BirdersLogArea> {
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: DataTable(
-          headingTextStyle: GoogleFonts.jua(
-            fontSize: 14,
+          headingTextStyle: TextStyle(
+            fontFamily: 'Paperlogy',
             fontWeight: FontWeight.w700,
+            fontSize: 14,
             color: Colors.black87,
           ),
-          dataTextStyle: GoogleFonts.jua(
+          dataTextStyle: TextStyle(
+            fontFamily: 'Paperlogy',
             fontSize: 14,
             color: Colors.black87,
           ),
