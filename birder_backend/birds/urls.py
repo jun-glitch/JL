@@ -10,6 +10,8 @@ from .views import (
     SpeciesMapRecordsView,
     ObservationUploadView,
 )   
+from .views_fieldguide import FieldGuideView
+from .views_species_detail import SpeciesObservationsView
 
 urlpatterns = [
     # 새 식별 관련 엔드포인트
@@ -31,5 +33,13 @@ urlpatterns = [
 
     # 관측 로그 업로드
     path("observations/upload/", ObservationUploadView.as_view(), name="observation_upload"),
+
+    # 도감 메인(목별 그리드 + 관측 여부/대표사진)
+    path("fieldguide/", FieldGuideView.as_view(), name="fieldguide"),
+
+    # 종 상세(슬라이드 + 로그)
+    path("species/<int:species_id>/observations/", SpeciesObservationsView.as_view(), name="species_observations"),
+
 ]
+
 
