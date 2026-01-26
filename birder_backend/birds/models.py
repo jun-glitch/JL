@@ -23,10 +23,8 @@ class BirdIdentifySession(models.Model):
 class BirdCandidate(models.Model):
     session = models.ForeignKey(BirdIdentifySession, on_delete=models.CASCADE, related_name="candidates")
     rank = models.IntegerField()  # 후보 순위(0~4)
-    common_name_ko = models.CharField(max_length=100)
-    scientific_name = models.CharField(max_length=100, blank=True, default="")
-    short_description = models.TextField(blank=True, default="")
-    wikimedia_image_url = models.URLField(blank=True, default="")
+
+    species = models.ForeignKey("Species", on_delete=models.PROTECT, related_name="candidates")
 
     def __str__(self):
         return f"Candidate<{self.rank}: {self.common_name_ko}>"

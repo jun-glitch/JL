@@ -10,7 +10,6 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
-from urllib3 import request
 
 from .models import BirdIdentifySession, BirdCandidate, Photo, Species, Log
 from .serializers import BirdCandidateSerializer, BirdIdentifySessionSerializer, UploadBirdPhotoSerializer, SpeciesSummarySerializer, LogItemSerializer, ObservationUploadSerializer 
@@ -51,10 +50,10 @@ def extract_exif_data(image_file):
         if "GPSLatitude" in gps_info and "GPSLatitudeRef" in gps_info:
             lat = get_decimal_from_dms(gps_info["GPSLatitude"], gps_info["GPSLatitudeRef"])
             lng = get_decimal_from_dms(gps_info["GPSLongitude"], gps_info["GPSLongitudeRef"])
-            return lat, lng
+            return lat, lng, obs_date
     except Exception as e:
         print(f"EXIF 추출 에러: {e}")
-    return None, None
+    return lat, lng, obs_date
 
 class IdentifyView(APIView):
     permission_classes = [IsAuthenticated]
@@ -66,7 +65,7 @@ class IdentifyView(APIView):
             return Response({"detail": "image file required"}, status=status.HTTP_400_BAD_REQUEST)
         
         # 1-1) 이미지에서 위치정보 추출
-        lat, lng = extract_exif_data(image)
+        lat, lng, obs_date = extract_exif_data(image)
         image.seek(0)
 
         # 1-2) supabase storage에 이미지파일 저장 및 photo 테이블에 사진 내용 저장
@@ -138,7 +137,7 @@ class IdentifyNextView(APIView):
         if session.current_index >= candidates.count():
             session.is_finished = True
             session.save()
-            return Response({"detail": "no more candidates", "is_finished": True})
+            return Response({"detail": "no more candidates", "is_finished": True, "reupload_required": True,})
 
         candidate = candidates[session.current_index]
         return Response({
@@ -159,7 +158,9 @@ class IdentifyAnswerView(APIView):
             return Response({"detail": "answer must be 'yes' or 'no'"}, status=status.HTTP_400_BAD_REQUEST)
 
         candidates = session.candidates.order_by("rank")
-        if session.current_index >= candidates.count():
+        total = candidates.count()
+
+        if session.current_index >= total:
             session.is_finished = True
             session.save()
             return Response({"detail": "no more candidates", "is_finished": True})
@@ -171,14 +172,48 @@ class IdentifyAnswerView(APIView):
             session.selected_candidate = current_candidate
             session.is_finished = True
             session.save()
+           
+            photo = Photo.objects.create(
+               image=session.image,
+               latitude=session.latitude,
+               longitude=session.longitude,
+               obs_date=session.obs_date,
+            )
+
+            location = "UNKNOWN"
+            if session.latitude is not None and session.longitude is not None:
+                try:
+                    location = normalize_area_from_latlon(float(session.latitude), float(session.longitude))
+                except Exception:
+                    location = "UNKNOWN"
+
+            log = Log.objects.create(
+                user=request.user,
+                photo=photo,
+                species=current_candidate.species,
+                location=location,
+            )
+
             return Response({
                 "detail": "selected",
                 "selected": BirdCandidateSerializer(current_candidate).data,
                 "is_finished": True,
+                "log_id": log.id,
             })
 
         # answer == "no" → 다음 후보로
         session.current_index += 1
+
+        if session.current_index >= total:
+            session.is_finished = True
+            session.save()
+            return Response({
+                "detail": "no more candidates",
+                "is_finished": True,
+                "reupload_required": True,
+                "next_index": session.current_index,
+        })
+
         session.save()
         return Response({
             "detail": "next",
@@ -254,7 +289,7 @@ class AreaSpeciesSummaryView(APIView):
         # 추후 위도 정보 처리 방법에 따라서 수정 필요
         qs = (
             Log.objects
-            .filter(location__icontains=area)
+            .filter(photo__area_full__icontains=area)
             .values("species_id", "species__common_name", "species__scientific_name")
             .annotate(total_count=Count("id"))
             .order_by("-total_count")
@@ -328,7 +363,7 @@ class SpeciesMapPointsView(APIView):
                 grid_lng=Round("photo__longitude", 4),
             )
             .values("grid_lat", "grid_lng")
-            .annotate(count=Count("num"))
+            .annotate(count=Count("pk"))
             .order_by("-count")
         )
 
@@ -378,10 +413,7 @@ class SpeciesMapRecordsView(APIView):
             .filter(species_id=species_code, photo__obs_date__date__range=(start, end))
             .exclude(photo__latitude__isnull=True)
             .exclude(photo__longitude__isnull=True)
-            .annotate(
-                grid_lat=Round("photo__latitude", 4),
-                grid_lng=Round("photo__longitude", 4),
-            )
+            .values("photo__grid_lat", "photo__grid_lng").annotate(count=Count("pk"))
             .filter(grid_lat=grid_lat, grid_lng=grid_lng)
             .select_related("photo")
             .order_by("-photo__obs_date")
