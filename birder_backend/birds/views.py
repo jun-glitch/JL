@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+import requests
 
 from django.db.models import Count
 from django.db.models.functions import Round
@@ -14,7 +15,7 @@ from django.shortcuts import get_object_or_404
 
 from .models import BirdIdentifySession, BirdCandidate, Photo, Species, Log
 from .serializers import BirdCandidateSerializer, BirdIdentifySessionSerializer, UploadBirdPhotoSerializer, SpeciesSummarySerializer, LogItemSerializer, ObservationUploadSerializer 
-from .services.identify import gpt_top5_candidates, build_candidates_with_images
+from .services.identify import mock_top5_candidates, build_candidates_with_images
 from .utils.geocode import normalize_area_from_latlon
 from integrations.supabase_client import supabase
 
@@ -64,8 +65,27 @@ def extract_exif_data(image_file):
         print(f"EXIF 추출 에러: {e}")
     return lat, lng, obs_date
 
+# 위도 경도를 통해 행정구역을 반환받는 함수
+def get_administrative_area(lat, lng):
+    url = "https://dapi.kakao.com/v2/local/geo/coord2regioncode.json"
+    headers = {
+        "Authorization" : f"KakaoAK {settings.KAKAO_REST_API_KEY}"
+    }
+    params = {
+        "x" : lng,
+        "y" : lat
+    }
+    response = requests.get(url, headers=headers, params=params)
+
+    if response.status_code == 200 :
+        data = response.json()
+        if data['documents'] :
+            return data['documents'][0]['address_name']
+    
+    return None
+
 class IdentifyView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         # 1) 이미지 파일 받기
@@ -74,9 +94,10 @@ class IdentifyView(APIView):
             return Response({"detail": "image file required"}, status=status.HTTP_400_BAD_REQUEST)
         
         # 2) 식별 세션 생성
-        session = BirdIdentifySession.objects.c:contentReference[oaicite:15]{index=15}e_url=image_url)
+        session = BirdIdentifySession.objects.create(user=request.user, image=image)
+
         # 3) Top5 후보 생성(현재 mock -> 추후 Chat-GPT API 연동 예정)
-        top5 = gpt_top5_candidates(image_url=image_url)
+        top5 = mock_top5_candidates()
         top5 = build_candidates_with_images(top5)
 
         # 4) 후보 DB 저장
@@ -194,10 +215,10 @@ class IdentifyAnswerView(APIView):
         })
 
 # 변경된 ERD & supabase 연동 수정 완료
+# data["image", "species_code"]
 class UploadBirdPhotoView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
-    
     def post(self, request):
         serializer = UploadBirdPhotoSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -248,10 +269,15 @@ class UploadBirdPhotoView(APIView):
             
             photo_num = db_photo_res.data[0]["photo_num"]
 
+            location = None
+            if lat is not None and lng is not None:
+                location = get_administrative_area(lat, lng)
+
             log_data = {
                 "photo_num" : photo_num,
                 "species_code" : data["species_code"],
                 "reg_date" : datetime.now().isoformat(),
+                "location" : location,
                 "id" : request.user.id
             }
 
@@ -267,6 +293,7 @@ class UploadBirdPhotoView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
 # 지역별 종별 누적 관측 횟수 뷰    
 class AreaSpeciesSummaryView(APIView):
     permission_classes = [IsAuthenticated]
