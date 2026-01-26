@@ -6,6 +6,7 @@ from django.db.models.functions import Round
 from django.utils import timezone
 from django.conf import settings
 
+from httpcore import request
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
@@ -14,8 +15,10 @@ from django.shortcuts import get_object_or_404
 
 from .models import BirdIdentifySession, BirdCandidate, Photo, Species, Log
 from .serializers import BirdCandidateSerializer, BirdIdentifySessionSerializer, UploadBirdPhotoSerializer, SpeciesSummarySerializer, LogItemSerializer, ObservationUploadSerializer 
-from .services.identify import mock_top5_candidates, build_candidates_with_images
+from .services.identify import gpt_top5_candidates, build_candidates_with_images
 from .utils.geocode import normalize_area_from_latlon
+from .utils.supabase_storage import get_public_url
+
 from integrations.supabase_client import supabase
 
 from PIL import Image
@@ -74,10 +77,28 @@ class IdentifyView(APIView):
             return Response({"detail": "image file required"}, status=status.HTTP_400_BAD_REQUEST)
         
         # 2) 식별 세션 생성
-        session = BirdIdentifySession.objects.create(user=request.user, image=image)
+        file_path = f"identify/{uuid.uuid4().hex}_{image.name}"
+        image_bytes = image.read()
+        image.seek(0)
 
-        # 3) Top5 후보 생성(현재 mock -> 추후 Chat-GPT API 연동 예정)
-        top5 = mock_top5_candidates()
+        upload_res = supabase.storage.from_("bird_photos").upload(
+            file_path,
+            image_bytes,
+            {"content-type": image.content_type or "image/jpeg"},
+        )
+
+        # 업로드 실패 방어
+        if getattr(upload_res, "error", None):
+            return Response({"detail": "supabase upload failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        image_url = get_public_url("bird_photos", file_path)
+        if not image_url:
+            return Response({"detail": "failed to get public url"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        session = BirdIdentifySession.objects.create(user=request.user, image_url=image_url)
+        
+        # 3) Top5 후보 생성
+        top5 = gpt_top5_candidates(session.image_url)
         top5 = build_candidates_with_images(top5)
 
         # 4) 후보 DB 저장
