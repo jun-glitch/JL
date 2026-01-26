@@ -14,7 +14,7 @@ from django.shortcuts import get_object_or_404
 
 from .models import BirdIdentifySession, BirdCandidate, Photo, Species, Log
 from .serializers import BirdCandidateSerializer, BirdIdentifySessionSerializer, UploadBirdPhotoSerializer, SpeciesSummarySerializer, LogItemSerializer, ObservationUploadSerializer 
-from .services.identify import mock_top5_candidates, build_candidates_with_images
+from .services.identify import gpt_top5_candidates, build_candidates_with_images
 from .utils.geocode import normalize_area_from_latlon
 from integrations.supabase_client import supabase
 
@@ -74,10 +74,9 @@ class IdentifyView(APIView):
             return Response({"detail": "image file required"}, status=status.HTTP_400_BAD_REQUEST)
         
         # 2) 식별 세션 생성
-        session = BirdIdentifySession.objects.create(user=request.user, image=image)
-
+        session = BirdIdentifySession.objects.c:contentReference[oaicite:15]{index=15}e_url=image_url)
         # 3) Top5 후보 생성(현재 mock -> 추후 Chat-GPT API 연동 예정)
-        top5 = mock_top5_candidates()
+        top5 = gpt_top5_candidates(image_url=image_url)
         top5 = build_candidates_with_images(top5)
 
         # 4) 후보 DB 저장
