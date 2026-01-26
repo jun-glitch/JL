@@ -149,7 +149,6 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
 
-
           // 계정
           _buildBubbleButton(
             screenSize: screenSize,

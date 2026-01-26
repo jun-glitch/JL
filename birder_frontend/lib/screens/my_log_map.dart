@@ -187,7 +187,6 @@ class _MyLogMapState extends State<MyLogMap> {
     );
   }
 
-
   @override
   Widget build(BuildContext context) {
     const sky = Color(0xFFDCEBFF);
