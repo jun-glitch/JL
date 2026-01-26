@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from django.db.models import Count
 from django.db.models.functions import Round
@@ -6,7 +7,7 @@ from django.utils import timezone
 from django.conf import settings
 
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
@@ -42,6 +43,15 @@ def extract_exif_data(image_file):
         gps_info = {}
         for tag, value in exif_data.items():
             decoded = TAGS.get(tag, tag)
+
+            # 날짜정보 추출
+            if decoded == "DateTimeOriginal":
+                try:
+                    obs_date = datetime.strptime(value, "%Y:%m:%d %H:%M:%S")
+                except ValueError:
+                    pass
+
+            # 위치정보 추출
             if decoded == "GPSInfo":
                 for t in value:
                     sub_tag = GPSTAGS.get(t, t)
@@ -50,13 +60,12 @@ def extract_exif_data(image_file):
         if "GPSLatitude" in gps_info and "GPSLatitudeRef" in gps_info:
             lat = get_decimal_from_dms(gps_info["GPSLatitude"], gps_info["GPSLatitudeRef"])
             lng = get_decimal_from_dms(gps_info["GPSLongitude"], gps_info["GPSLongitudeRef"])
-            return lat, lng, obs_date
     except Exception as e:
         print(f"EXIF 추출 에러: {e}")
     return lat, lng, obs_date
 
 class IdentifyView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def post(self, request):
         # 1) 이미지 파일 받기
@@ -64,43 +73,8 @@ class IdentifyView(APIView):
         if not image:
             return Response({"detail": "image file required"}, status=status.HTTP_400_BAD_REQUEST)
         
-        # 1-1) 이미지에서 위치정보 추출
-        lat, lng, obs_date = extract_exif_data(image)
-        image.seek(0)
-
-        # 1-2) supabase storage에 이미지파일 저장 및 photo 테이블에 사진 내용 저장
-        try:
-            file_ext = image.name.split('.')[-1]
-            file_name = f"{uuid.uuid4()}.{file_ext}"
-            
-            # 파일을 바이너리로 읽기
-            file_content = image.read()
-            
-            # Supabase Storage에 업로드
-            # .upload(경로, 파일데이터, 옵션)
-            storage_response = supabase.storage.from_(settings.SUPABASE_STORAGE_BUCKET).upload(
-                path=file_name,
-                file=file_content,
-                file_options={"content-type": image.content_type}
-            )
-
-            # 업로드된 파일의 Public URL 가져오기
-            image_url = supabase.storage.from_(settings.SUPABASE_STORAGE_BUCKET).get_public_url(file_name)
-
-            photo_data = {
-                "s_fileNum" : image_url,
-                "latitude" : lat,
-                "longitude" : lng,
-                "obs_date" : ""
-            }
-        
-            db_res = supabase.table("photo").insert(photo_data).execute()
-        except Exception as e:
-            return Response({"detail" : f"Storage upload failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
-
         # 2) 식별 세션 생성
-        session = BirdIdentifySession.objects.create(user=request.user, image_url=image_url, db_data = db_res.data)
+        session = BirdIdentifySession.objects.create(user=request.user, image=image)
 
         # 3) Top5 후보 생성(현재 mock -> 추후 Chat-GPT API 연동 예정)
         top5 = mock_top5_candidates()
@@ -198,7 +172,6 @@ class IdentifyAnswerView(APIView):
                 "detail": "selected",
                 "selected": BirdCandidateSerializer(current_candidate).data,
                 "is_finished": True,
-                "log_id": log.id,
             })
 
         # answer == "no" → 다음 후보로
@@ -221,61 +194,76 @@ class IdentifyAnswerView(APIView):
             "is_finished": False,
         })
 
+# 변경된 ERD & supabase 연동 수정 완료
 class UploadBirdPhotoView(APIView):
-    # ERD 변경시 수정 필요
     permission_classes = [IsAuthenticated]
 
+    
     def post(self, request):
         serializer = UploadBirdPhotoSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-
         image = data["image"]
-        lat = data.get("latitude")
-        lon = data.get("longitude")
-        obs_date = data.get("obs_date")
-        species_id = data["species_code"]
 
-        # 종 존재 확인
+        # 1) 이미지에서 위치정보 추출
+        lat, lng, obs_date = extract_exif_data(image)
+        image.seek(0)
+
+        # 2) Supabase Storage에 이미지 업로드
         try:
-            species = Species.objects.get(id=species_id)
-        except Species.DoesNotExist:
-            return Response({"detail": "Invalid species_id"}, status=status.HTTP_400_BAD_REQUEST)
+            file_ext = image.name.split('.')[-1]
+            file_name = f"{uuid.uuid4()}.{file_ext}"
+            
+            # 파일을 바이너리로 읽기
+            file_content = image.read()
+            
+            # .upload(경로, 파일데이터, 옵션)
+            storage_response = supabase.storage.from_(settings.SUPABASE_STORAGE_BUCKET).upload(
+                path=file_name,
+                file=file_content,
+                file_options={"content-type": image.content_type}
+            )
 
-        photo = Photo.objects.create(
-            image=image,
-            latitude=lat,
-            longitude=lon,
-            obs_date=obs_date,
-        )
+            # 업로드된 파일의 Public URL 가져오기
+            image_url = supabase.storage.from_(settings.SUPABASE_STORAGE_BUCKET).get_public_url(file_name)
+        except Exception as e:
+            return Response({"detail" : f"Storage upload failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        # 3) photo 테이블에 인스턴스 추가
+        try:
+            photo_data = {
+                "s_fileNum" : image_url,
+                "latitude" : lat,
+                "longitude" : lng,
+                "obs_date" : obs_date.isoformat() if obs_date else None
+            }
+        
+            db_photo_res = supabase.table("photo").insert(photo_data).execute()
+        except Exception as e:
+            return Response({"detail" : f"Supabase Photo table upload failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        """
-        location column 삭제 수정일자 26.01.22
-        # 사진 업로드 시점에 정규화
-        location = "UNKNOWN"
-        if lat is not None and lon is not None:
-            try:
-                location = normalize_area_from_latlon(float(lat), float(lon))
-            except Exception:
-                # 역지오코딩 실패해도 업로드 자체는 성공시키고, location만 UNKNOWN으로 -> 되는지 해보고 수정 필요
-                location = "UNKNOWN"
+        # 4) log 테이블에 인스턴스 추가
+        try:
+            if not db_photo_res.data : 
+                return Response({"error" : "Failed to retrieve saved photo data"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            photo_num = db_photo_res.data[0]["photo_num"]
 
-        """
-        log = Log.objects.create(
-            user=request.user,
-            photo=photo,
-            species=species,
-            # location=location,
-        )
+            log_data = {
+                "photo_num" : photo_num,
+                "species_code" : data["species_code"],
+                "reg_date" : datetime.now().isoformat(),
+                "id" : request.user.id
+            }
 
-        # supabase 연동 시 수정 필요
-        image_url = request.build_absolute_uri(photo.image.url)
-
+            db_log_res = supabase.table("log").insert(log_data).execute()
+        except Exception as e:
+            return Response({"detail" : f"Supabase log table upload failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
         return Response(
             {
-                "log_id": log.id,
-                "photo_id": photo.id,
-                # "location": location,
+                "log_id": db_log_res.data[0]["log_num"],
+                "photo_id": photo_num,
                 "image_url": image_url,
             },
             status=status.HTTP_201_CREATED,
