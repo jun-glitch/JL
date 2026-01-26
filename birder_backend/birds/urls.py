@@ -41,5 +41,3 @@ urlpatterns = [
     path("species/<int:species_id>/observations/", SpeciesObservationsView.as_view(), name="species_observations"),
 
 ]
-
-

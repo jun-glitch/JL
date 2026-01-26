@@ -31,22 +31,6 @@ class BirdCandidate(models.Model):
     def __str__(self):
         return f"Candidate<{self.rank}: {self.common_name_ko}>"
 
-class Photo(models.Model):
-    photo_num = models.BigAutoField(primary_key=True)
-    
-    image = models.ImageField(upload_to="uploads/birds/")  # supabase 전환 시 변경 필요
-    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    
-    obs_date = models.DateTimeField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    grid_lat = models.DecimalField(max_digits=9, decimal_places=4, db_index=True)
-    grid_lng = models.DecimalField(max_digits=9, decimal_places=4, db_index=True)
-
-    def __str__(self):
-        return f"Photo<{self.id}>"
-
 class Species(models.Model):
     # supabase 구축 되면 조정 필요 
     species_code = models.BigAutoField(primary_key=True)
