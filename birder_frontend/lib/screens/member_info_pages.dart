@@ -51,9 +51,10 @@ class MemberInfoPage extends StatelessWidget {
               // 제목
               Text(
                 '회원 정보',
-                style: GoogleFonts.jua(
+                style: TextStyle(
+                  fontFamily: 'Paperlogy',
+                  fontWeight: FontWeight.w400,
                   fontSize: 26,
-                  fontWeight: FontWeight.w500,
                   color: Colors.black,
                 ),
               ),
@@ -100,7 +101,9 @@ class MemberInfoPage extends StatelessWidget {
                   },
                   child: Text(
                     '비밀번호 변경',
-                    style: GoogleFonts.jua(
+                    style: TextStyle(
+                      fontFamily: 'Paperlogy',
+                      fontWeight: FontWeight.w400,
                       fontSize: 20,
                       color: Colors.black,
                     ),
@@ -128,7 +131,9 @@ class MemberInfoPage extends StatelessWidget {
                     },
                     child: Text(
                       '로그아웃',
-                      style: GoogleFonts.jua(
+                      style: TextStyle(
+                        fontFamily: 'Paperlogy',
+                        fontWeight: FontWeight.w400,
                         fontSize: 16,
                         color: Colors.black54,
                       ),
@@ -145,7 +150,9 @@ class MemberInfoPage extends StatelessWidget {
                     },
                     child: Text(
                       '회원탈퇴',
-                      style: GoogleFonts.jua(
+                      style: TextStyle(
+                        fontFamily: 'Paperlogy',
+                        fontWeight: FontWeight.w400,
                         fontSize: 16,
                         color: Colors.black54,
                       ),
@@ -175,13 +182,18 @@ class _InfoRow extends StatelessWidget {
           width: 70,
           child: Text(
             label,
-            style: GoogleFonts.jua(fontSize: 16, color: Colors.black54),
+            style: TextStyle(
+                fontFamily: 'Paperlogy',
+                fontWeight: FontWeight.w400,
+                fontSize: 16, color: Colors.black54),
           ),
         ),
         Expanded(
           child: Text(
             value,
-            style: GoogleFonts.jua(
+            style: TextStyle(
+              fontFamily: 'Paperlogy',
+              fontWeight: FontWeight.w400,
               fontSize: 18,
               color: Colors.black87,
             ),

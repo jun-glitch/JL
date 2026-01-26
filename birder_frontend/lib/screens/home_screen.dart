@@ -123,8 +123,8 @@ class _HomeScreenState extends State<HomeScreen> {
             top: screenSize.height * 0.25,
             left: screenSize.width * 0.10,
             size: mid,
+            backgroundColor: const Color(0xFFB0CEFF),
             text: 'MY Log',
-            textHeight: 1.0,
             onTap: () {
               Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const MyLogPage())
@@ -138,8 +138,10 @@ class _HomeScreenState extends State<HomeScreen> {
             top: screenSize.height * 0.31,
             left: screenSize.width * 0.50,
             size: mid * 0.85,
+            backgroundColor: const Color(0xFF98BFFF),
             text: 'Birder\'s \n Log',
-            textHeight: 0.9,
+            textHeight: 1.17,
+            yOffset: 3.5,
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const BirdersLogMain())
@@ -152,10 +154,10 @@ class _HomeScreenState extends State<HomeScreen> {
           _buildBubbleButton(
             screenSize: screenSize,
             top: screenSize.height * 0.45,
-            left: screenSize.width * 0.72,
+            left: screenSize.width * 0.705,
             size: small,
+            backgroundColor: const Color(0xFF7FAFFF),
             text: '계정',
-            textHeight: 1.0,
             onTap: () async {
               final prefs = await SharedPreferences.getInstance();
               final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
@@ -199,12 +201,11 @@ class _HomeScreenState extends State<HomeScreen> {
           _buildBubbleButton(
             screenSize: screenSize,
             top: screenSize.height * 0.43,
-            left: screenSize.width * 0.07,
+            left: screenSize.width * 0.04,
             size: big,
+            backgroundColor: const Color(0xFFC5DBFF),
             text: '새 검색',
-            textHeight: 1.0,
             onTap: _toggleNewSearch,
-            backgroundColor: _isNewSearchExpanded ? const Color(0xFFA1C4FD) : const Color(0xFFA1C4FD),
           ),
 
           // 새 검색 서브 메뉴 (확장 시)
@@ -213,6 +214,7 @@ class _HomeScreenState extends State<HomeScreen> {
             top: screenSize.height * 0.25,
             left: screenSize.width * 0.10,
             size: mid,
+            backgroundColor: const Color(0xFFB0CEFF),
             text: '촬영',
             onTap: () => _openCameraAndSave(),
           ),
@@ -221,17 +223,18 @@ class _HomeScreenState extends State<HomeScreen> {
             top: screenSize.height * 0.31,
             left: screenSize.width * 0.50,
             size: mid * 0.85,
+            backgroundColor: const Color(0xFF98BFFF),
             text: '사진 \n 업로드',
             onTap: () => _pickFromGalleryAndSave(),
           ),
           _buildAnimatedBubbleButton(
             screenSize: screenSize,
             top: screenSize.height * 0.45,
-            left: screenSize.width * 0.72,
+            left: screenSize.width * 0.705,
             size: small,
             text: 'cancel',
             onTap: _toggleNewSearch,
-            backgroundColor: Colors.grey[300],
+            backgroundColor: Colors.grey[350],
             textColor: Colors.black,
           ),
         ],
@@ -247,9 +250,10 @@ class _HomeScreenState extends State<HomeScreen> {
     required double size,
     required String text,
     required VoidCallback onTap,
-    required double textHeight,
+    double? textHeight,
     Color? backgroundColor,
     Color textColor = Colors.black,
+    double yOffset = 0,
   }) {
     return Positioned(
       top: top,
@@ -264,14 +268,18 @@ class _HomeScreenState extends State<HomeScreen> {
             shape: BoxShape.circle,
           ),
           child: Center(
+            child: Transform.translate(offset: Offset(0, yOffset),
             child: Text(
               text,
               textAlign: TextAlign.center,
-              style: GoogleFonts.jua(
+              style: TextStyle(
+                fontFamily: 'Paperlogy',
+                fontWeight: FontWeight.w600,
                 fontSize: size * 0.23,
                 color: textColor,
-                height: 1.15, //
+                height: textHeight, //
               ),
+            ),
             ),
           ),
 
@@ -319,7 +327,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Text(
                   text,
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.jua(
+                  style: TextStyle(
+                    fontFamily: 'Paperlogy',
+                    fontWeight: FontWeight.w600,
                     fontSize: size * 0.23,
                     color: textColor,
                   ),

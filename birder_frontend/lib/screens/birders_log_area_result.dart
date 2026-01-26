@@ -188,7 +188,7 @@ class _BirdersLogAreaResultState extends State<BirdersLogAreaResult> {
                     '지역별로 보기',
                     style: TextStyle(
                       fontFamily: 'Paperlogy',
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                       fontSize: 27,
                       color: Colors.black,
                     ),

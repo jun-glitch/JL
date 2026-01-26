@@ -41,7 +41,7 @@ class _BirdersLogMainState extends State<BirdersLogMain> {
             Text(
               '다른 Birder들이 관측한 기록 로그',
               style: TextStyle(
-                fontFamily: 'NotoSansKR',
+                fontFamily: 'Paperlogy',
                 fontWeight: FontWeight.w700,
                 fontSize: 18,
                 color: Colors.black87,
@@ -122,13 +122,6 @@ class _MenuCardButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 10,
-              offset: const Offset(0, 6),
-            ),
-          ],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -141,7 +134,7 @@ class _MenuCardButton extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                fontFamily: 'NotoSansKR',
+                fontFamily: 'Paperlogy',
                 fontWeight: FontWeight.w500,
                 fontSize: 25,
                 color: Colors.black,

@@ -44,6 +44,7 @@ class BirdTile extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
+              fontFamily: 'Paperlogy',
               fontSize: 14,
               fontWeight: FontWeight.w600,
               color: canOpen ? Colors.black : Colors.black54,

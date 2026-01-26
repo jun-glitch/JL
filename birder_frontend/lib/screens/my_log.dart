@@ -1,3 +1,4 @@
+import 'package:birder_frontend/screens/my_log_map.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:birder_frontend/screens/bird_tile.dart';
@@ -61,6 +62,18 @@ class _MyLogPageState extends State<MyLogPage> {
             color: Colors.black,
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.public),
+              iconSize: 36,
+              color: const Color(0xFF7FAFFF),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const MyLogMap())
+              );},
+          ),
+          const SizedBox(width: 10),
+        ],
       ),
 
       body: CustomScrollView(

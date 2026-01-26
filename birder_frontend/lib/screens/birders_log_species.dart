@@ -98,7 +98,7 @@ class _BirdersLogSpeciesState extends State<BirdersLogSpecies> {
                     '종별로 보기',
                     style: TextStyle(
                       fontFamily: 'Paperlogy',
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                       fontSize: 28,
                       color: Colors.black,
                     ),

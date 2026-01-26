@@ -101,7 +101,10 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
             Expanded(
               child: Text(
                 text,
-                style: GoogleFonts.jua(fontSize: 18, color: Colors.black87),
+                style: TextStyle(
+                    fontFamily: 'Paperlogy',
+                    fontWeight: FontWeight.w400,
+                    fontSize: 18, color: Colors.black87),
               ),
             ),
             const Icon(Icons.calendar_month_outlined, size: 24),
@@ -229,7 +232,9 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
             const SizedBox(height: 2),
             Text(
               '다른 Birder들이 관측한 기록 로그',
-              style: GoogleFonts.jua(
+              style: TextStyle(
+                fontFamily: 'Paperlogy',
+                fontWeight: FontWeight.w700,
                 fontSize: 18,
                 color: Colors.black87,
               ),
@@ -261,9 +266,10 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
                   const SizedBox(width: 10),
                   Text(
                     '종별로 보기',
-                    style: GoogleFonts.jua(
+                    style: TextStyle(
+                      fontFamily: 'Paperlogy',
+                      fontWeight: FontWeight.w600,
                       fontSize: 28,
-                      fontWeight: FontWeight.w400,
                       color: Colors.black,
                     ),
                   ),
@@ -274,9 +280,10 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
               Center(
                 child: Text(
                   '${_resolveSpeciesName(context)} 지역별 누적 관측 기록',
-                  style: GoogleFonts.jua(
+                  style: TextStyle(
+                    fontFamily: 'Paperlogy',
+                    fontWeight: FontWeight.w400,
                     fontSize: 24,
-                    fontWeight: FontWeight.w500,
                     color: Colors.black,
                   ),
                 ),
@@ -301,7 +308,9 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
                       padding: const EdgeInsets.only(left: 6),
                       child: Text(
                         '검색 기간',
-                        style: GoogleFonts.jua(
+                        style: TextStyle(
+                          fontFamily: 'Paperlogy',
+                          fontWeight: FontWeight.w400,
                           fontSize: 20,
                           color: Colors.black87,
                         ),
@@ -321,7 +330,10 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
                         const SizedBox(width: 10),
                         Text(
                           '~',
-                          style: GoogleFonts.jua(fontSize: 16),
+                          style: TextStyle(
+                              fontFamily: 'Paperlogy',
+                              fontWeight: FontWeight.w400,
+                              fontSize: 16),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
