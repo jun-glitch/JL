@@ -31,16 +31,6 @@ class BirdCandidate(models.Model):
     def __str__(self):
         return f"Candidate<{self.rank}: {self.common_name_ko}>"
 
-class Species(models.Model):
-    # ERD의 species_code 같은 역할을 Django id가 대신, ERD 수정되면 수정 필요
-    species_code = models.BigAutoField(primary_key=True)
-    common_name = models.CharField(max_length=100)    
-    scientific_name = models.CharField(max_length=100) 
-    # 위키미디어 대표 이미지 url, 분류(목/과/속/종), 영문명 등 이후에 추가
-
-    def __str__(self):
-        return f"{self.common_name} ({self.scientific_name})"
-
 class Photo(models.Model):
     photo_num = models.BigAutoField(primary_key=True)
     
