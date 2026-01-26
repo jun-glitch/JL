@@ -28,6 +28,7 @@ class BirdCandidate(models.Model):
     short_description = models.TextField(blank=True, default="")
     wikimedia_image_url = models.URLField(blank=True, default="")
 
+    confidence = models.FloatField(default=0.0)  # GPT가 준 신뢰도 점수
     def __str__(self):
         return f"Candidate<{self.rank}: {self.common_name_ko}>"
 

@@ -9,14 +9,22 @@ from .utils.geocode import normalize_area_from_latlon
 class BirdCandidateSerializer(serializers.ModelSerializer):
     class Meta:
         model = BirdCandidate 
-        fields = ["id", "rank", "common_name_ko", "scientific_name", "short_description", "wikimedia_image_url"]
+        fields = ["id", "rank", "common_name_ko", "scientific_name", "short_description", "wikimedia_image_url", "confidence"]
 
 class BirdIdentifySessionSerializer(serializers.ModelSerializer):
     candidates = BirdCandidateSerializer(many=True, read_only=True)
 
     class Meta:
         model = BirdIdentifySession
-        fields = ["id", "current_index", "is_finished", "selected_candidate", "created_at", "candidates"]
+        fields = [
+            "id",
+            "image_url"
+            "current_index",
+            "is_finished",
+            "selected_candidate",
+            "created_at",
+            "candidates"
+            ]
 
 class UploadBirdPhotoSerializer(serializers.Serializer):
     image = serializers.ImageField()
@@ -25,7 +33,7 @@ class UploadBirdPhotoSerializer(serializers.Serializer):
     obs_date = serializers.DateTimeField(required=False)
 
     # GPT api 넣으면 수정 필요
-    species_id = serializers.IntegerField()
+    species_id = serializers.IntegerField(required=False, allow_null=True)
 
 class SpeciesSummarySerializer(serializers.Serializer):
     species_id = serializers.IntegerField()
