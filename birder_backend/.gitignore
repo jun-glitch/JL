@@ -20,3 +20,4 @@ config/db.sqlite3
 
 # VSCode
 .vscode/
+.DS_Store
