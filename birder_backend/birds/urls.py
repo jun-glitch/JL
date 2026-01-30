@@ -12,6 +12,7 @@ from .views import (
 )   
 from .views_fieldguide import FieldGuideView
 from .views_species_detail import SpeciesObservationsView
+from .views_map import MapPointsView, MapClustersView 
 
 urlpatterns = [
     # 새 식별 관련 엔드포인트
@@ -39,5 +40,8 @@ urlpatterns = [
 
     # 종 상세(슬라이드 + 로그)
     path("species/<int:species_id>/observations/", SpeciesObservationsView.as_view(), name="species_observations"),
-
+    
+    # 피크민st 지도 API v2
+    path("map/v2/points/", MapPointsView.as_view(), name="map_points_v2"),
+    path("map/v2/clusters/", MapClustersView.as_view(), name="map_clusters_v2"),
 ]
