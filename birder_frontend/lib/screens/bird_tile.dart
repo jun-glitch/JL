@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:birder_frontend/models/bird.dart';
 
-// my_log.dart에 Bird 클래스가 정의되어 있다고 가정
-import '../screens/my_log.dart';
 class BirdTile extends StatelessWidget {
   const BirdTile({
     super.key,
@@ -29,7 +28,7 @@ class BirdTile extends StatelessWidget {
                 color: Colors.grey.shade300, // 회색 상자
                 alignment: Alignment.center,
                 child: canOpen
-                    ? const Icon(Icons.check_circle_outline) // 발견 표시(선택)
+                    ? const Icon(Icons.check_circle_outline) // 발견 표시 임시
                     : const SizedBox.shrink(),
               ),
             ),
@@ -46,7 +45,7 @@ class BirdTile extends StatelessWidget {
             style: TextStyle(
               fontFamily: 'Paperlogy',
               fontSize: 14,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w400,
               color: canOpen ? Colors.black : Colors.black54,
             ),
           ),
