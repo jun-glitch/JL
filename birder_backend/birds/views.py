@@ -289,33 +289,64 @@ class UploadBirdPhotoView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
-# 지역별 종별 누적 관측 횟수 뷰    
-class AreaSpeciesSummaryView(APIView):
+
+# 지역별 누적 관측 횟수 뷰    
+class AreaSummaryView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, area: str):
-        # 예 :"대구광역시"를 넣으면 "대구광역시 중구"도 포함되도록 icontains
-        # 추후 위도 정보 처리 방법에 따라서 수정 필요
-        qs = (
-            Log.objects
-            .filter(photo__area_full__icontains=area)
-            .values("species_id", "species__common_name", "species__scientific_name")
-            .annotate(total_count=Count("id"))
-            .order_by("-total_count")
-        )
+        try:
+            response = supabase.table('log').select(
+                "species_code, species:species_code(common_name, scientific_name), "
+                "photo:photo_num!inner(location)"
+            ).ilike("photo.location", f"{area}%").execute()
 
-        payload = [
-            {
-                "species_id": row["species_id"],
-                "common_name": row["species__common_name"],
-                "scientific_name": row["species__scientific_name"],
-                "total_count": row["total_count"],
-            }
-            for row in qs
-        ]
+            logs = response.data
 
-        out = SpeciesSummarySerializer(payload, many=True)
-        return Response(out.data, status=status.HTTP_200_OK)
+            if not logs:
+                return Response([], status=status.HTTP_200_OK) # 검색된 로그가 없는 경우 빈 배열 전송
+            
+            summary_dict = {}
+            for entry in logs:
+                code = entry["species_code"]
+                species_info = entry.get("species")
+
+                if not species_info:
+                    continue
+
+                if code not in summary_dict:
+                    summary_dict[code] = {
+                        "species_code" : code,
+                        "common_name" : species_info["common_name"],
+                        "scientific_name" : species_info["scientific_name"],
+                        "total_count" : 0
+                    }
+                summary_dict[code]["total_count"] += 1
+            
+            payload = sorted(
+                summary_dict.values(),
+                key=lambda x: x["total_count"],
+                reverse=True
+            )
+
+            return Response(payload, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"detail" : f"Area search failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# 종별 누적 관측 횟수 뷰
+class SpeciesSummaryView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, species_code: str):
+        try:
+            response = supabase.table('log').select(
+                "species_code, species:species_code(common_name, scientific_name), "
+                "photo:photo_num!inner(location)"
+            ).ilike("log.species_code", f"{species_code}").execute()
+            payload = ()
+            return Response(payload, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"detail" : f"Species search failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # 특정 지역 + 종의 관측 로그 목록 뷰    
 class AreaSpeciesLogsView(APIView):    
