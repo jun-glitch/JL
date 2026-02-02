@@ -301,10 +301,10 @@ class AreaSummaryView(APIView):
                 "photo:photo_num!inner(location)"
             ).ilike("photo.location", f"{area}%").execute()
 
-            logs = response.data
-
             if not logs:
                 return Response([], status=status.HTTP_200_OK) # 검색된 로그가 없는 경우 빈 배열 전송
+
+            logs = response.data
             
             summary_dict = {}
             for entry in logs:
@@ -340,10 +340,38 @@ class SpeciesSummaryView(APIView):
     def get(self, request, species_code: str):
         try:
             response = supabase.table('log').select(
-                "species_code, species:species_code(common_name, scientific_name), "
-                "photo:photo_num!inner(location)"
-            ).ilike("log.species_code", f"{species_code}").execute()
-            payload = ()
+                "log_num, species_code, reg_date, species:species_code(common_name, scientific_name), "
+                "photo:photo_num!inner(s_fileNum, longitude, latitude, location, obs_date)"
+            ).ilike("species_code", species_code).filter("photo.latitude", "not.is", "null"
+            ).filter("photo.longitude", "not.is", "null").execute()
+
+            if not logs:
+                return Response([], status=status.HTTP_200_OK) # 검색된 로그가 없는 경우 빈 배열 전송
+            
+            logs = response.data
+
+            first_entry = logs[0]
+            species_info = first_entry.get('species')
+
+            payload = {
+                "species_code" : first_entry['species_code'],
+                "common_name" : species_info['common_name'] if species_info else None,
+                "scientific_name" : species_info['scientific_name'] if species_info else None,
+                "records" : []
+            }
+            for entry in logs:
+                photo = entry.get('photo')
+                if not photo or photo.get('latitude') is None or photo.get('longitude') is None:
+                    continue
+
+                payload['records'].append({
+                    "latitude" : photo['latitude'],
+                    "longitude" : photo['longitude'], # 값이 없을 경우 KeyError
+                    "location" : photo['location'],
+                    "image_url" : photo['s_fileNum'], # 이미지 url(supabase storage url)
+                    "date" : photo['obs_date'] if photo['obs_date'] else entry['reg_date'] # 사진의 촬영일자가 없을 경우 로그 등록일자
+                })
+            
             return Response(payload, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"detail" : f"Species search failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

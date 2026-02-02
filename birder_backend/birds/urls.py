@@ -4,7 +4,8 @@ from .views import (
     IdentifyNextView,
     IdentifyAnswerView,
     UploadBirdPhotoView,
-    AreaSpeciesSummaryView,
+    AreaSummaryView,
+    SpeciesSummaryView,
     AreaSpeciesLogsView,
     SpeciesMapPointsView,
     SpeciesMapRecordsView,
@@ -24,9 +25,12 @@ urlpatterns = [
     # 사진 업로드 + 위경도 정규화 + 로그 생성
     path("upload/", UploadBirdPhotoView.as_view(), name="birds_upload"),
     # 지역명으로 종별 누적 관측 횟수
-    path("areas/<str:area>/species/", AreaSpeciesSummaryView.as_view(), name="area_species_summary"),
+    path("areas/<str:area>/species/", AreaSummaryView.as_view(), name="area_summary"),
     # 특정 지역 + 종의 관측 로그 목록
     path("areas/<str:area>/species/<int:species_id>/logs/", AreaSpeciesLogsView.as_view(), name="area_species_logs"),
+
+    # 종명으로 지역별 누적 관측 횟수
+    path("species/<str:species>/", SpeciesSummaryView.as_view(), name="species_summary"),
 
     # 종별 지도
     path("map/points/", SpeciesMapPointsView.as_view(), name="species_map_points"),
