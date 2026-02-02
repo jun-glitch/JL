@@ -3,3 +3,4 @@
 *.vsidx
 *.suo
 venv/
+.DS_Store
