@@ -306,6 +306,8 @@ class AreaSummaryView(APIView):
 
             logs = response.data
             
+            logs = response.data
+
             summary_dict = {}
             for entry in logs:
                 code = entry["species_code"]
@@ -340,8 +342,8 @@ class SpeciesSummaryView(APIView):
     def get(self, request, species_code: str):
         try:
             response = supabase.table('log').select(
-                "log_num, species_code, reg_date, species:species_code(common_name, scientific_name), "
-                "photo:photo_num!inner(s_fileNum, longitude, latitude, location, obs_date)"
+                "log_num, species_code, reg_date species:species_code(common_name, scientific_name), "
+                "photo:photo_num!inner(s_fileNum, obs_date, latitude, longitude, location)"
             ).ilike("species_code", species_code).filter("photo.latitude", "not.is", "null"
             ).filter("photo.longitude", "not.is", "null").execute()
 
@@ -380,26 +382,29 @@ class SpeciesSummaryView(APIView):
 class AreaSpeciesLogsView(APIView):    
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, area: str, species_id: int):
+    def get(self, request, area: str, species_code: str):
         logs = (
             Log.objects
             .select_related("photo", "species")
-            .filter(location__icontains=area, species_id=species_id)
-            .order_by("-rec_date")
+            .filter(
+                user=request.user,
+                photo__area_full__startswith=area,
+                species__species_code=species_code
+            )
+            .order_by("-photo__obs_date", "-reg_date", "-num")
         )
 
-        # image_url supabase 연동 시 수정 필요
         items = []
         for log in logs:
             photo = log.photo
             items.append({
-                "log_id": log.id,
-                "location": log.location,
-                "rec_date": log.rec_date,
-                "obs_date": photo.obs_date,
-                "latitude": float(photo.latitude) if photo.latitude is not None else None,
-                "longitude": float(photo.longitude) if photo.longitude is not None else None,
-                "image_url": request.build_absolute_uri(photo.image.url),
+                "log_id": getattr(log, "num", log.id),
+                "location": getattr(photo, "area_full", ""),
+                "rec_date": getattr(log, "reg_date", None),  
+                "obs_date": getattr(photo, "obs_date", None),
+                "latitude": float(photo.latitude) if photo and photo.latitude is not None else None,
+                "longitude": float(photo.longitude) if photo and photo.longitude is not None else None,
+                "image_url": request.build_absolute_uri(photo.image.url) if (photo and getattr(photo, "image", None)) else None,
             })
 
         out = LogItemSerializer(items, many=True)
@@ -423,7 +428,11 @@ class SpeciesMapPointsView(APIView):
 
         qs = (
             Log.objects
-            .filter(species_id=species_code, photo__obs_date__date__range=(start, end))
+            .filter(
+                user=request.user,
+                species__species_code=species_code,
+                photo__obs_date__date__range=(start, end),
+            )
             .exclude(photo__latitude__isnull=True)
             .exclude(photo__longitude__isnull=True)
             .annotate(
@@ -431,7 +440,7 @@ class SpeciesMapPointsView(APIView):
                 grid_lng=Round("photo__longitude", 4),
             )
             .values("grid_lat", "grid_lng")
-            .annotate(count=Count("pk"))
+            .annotate(count=Count("num"))
             .order_by("-count")
         )
 
@@ -476,28 +485,34 @@ class SpeciesMapRecordsView(APIView):
         except ValueError:
             return Response({"detail": "grid_lat/grid_lng must be numbers."}, status=400)
 
-        qs = (
+        logs_qs = (
             Log.objects
-            .filter(species_id=species_code, photo__obs_date__date__range=(start, end))
+            .filter(
+                user=request.user,
+                species__species_code=species_code,
+                photo__obs_date__date__range=(start, end),
+            )
             .exclude(photo__latitude__isnull=True)
             .exclude(photo__longitude__isnull=True)
-            .values("photo__grid_lat", "photo__grid_lng").annotate(count=Count("pk"))
-            .filter(grid_lat=grid_lat, grid_lng=grid_lng)
+            .annotate(
+                grid_lat_4=Round("photo__latitude", 4),
+                grid_lng_4=Round("photo__longitude", 4),
+            )
+            .filter(grid_lat_4=grid_lat, grid_lng_4=grid_lng)
             .select_related("photo")
-            .order_by("-photo__obs_date")
+            .order_by("-photo__obs_date", "-reg_date", "-num")
         )
 
         records = []
-        for log in qs:
+        for log in logs_qs:
             photo = log.photo
             records.append({
-                "log_id": log.num,
-                "obs_date": photo.obs_date,
-                "area_full": photo.area_full,
-                "latitude": float(photo.latitude) if photo.latitude is not None else None,
-                "longitude": float(photo.longitude) if photo.longitude is not None else None,
-                "photo_url": photo.image.url if photo.image else None,
-                # photo_url은 supabase 연동 시 수정 필요 
+                "log_id": getattr(log, "num", log.id),
+                "obs_date": getattr(photo, "obs_date", None),
+                "area_full": getattr(photo, "area_full", ""),
+                "latitude": float(photo.latitude) if photo and photo.latitude is not None else None,
+                "longitude": float(photo.longitude) if photo and photo.longitude is not None else None,
+                "photo_url": request.build_absolute_uri(photo.image.url) if (photo and getattr(photo, "image", None)) else None,
             })
 
         return Response({

@@ -27,27 +27,25 @@ class BirdCandidate(models.Model):
     scientific_name = models.CharField(max_length=100, blank=True, default="")
     short_description = models.TextField(blank=True, default="")
     wikimedia_image_url = models.URLField(blank=True, default="")
-
     confidence = models.FloatField(default=0.0)  # GPT가 준 신뢰도 점수
+    species = models.ForeignKey("Species", null=True, blank=True, on_delete=models.SET_NULL)
+
     def __str__(self):
         return f"Candidate<{self.rank}: {self.common_name_ko}>"
 
 class Species(models.Model):
-    # supabase 구축 되면 조정 필요 
-    species_code = models.BigAutoField(primary_key=True)
-    common_name = models.CharField(max_length=100)
-    scientific_name = models.CharField(max_length=100)
-    order = models.CharField(max_length=100)
-    family_name = models.CharField(max_length=100)
-    detail = models.CharField(max_length=255)
+    species_code = models.CharField(max_length=50,primary_key=True)
+    common_name = models.CharField(max_length=100, default="")
+    scientific_name = models.CharField(max_length=100, default="")
+    order = models.CharField(max_length=100, default="")
+    family_name = models.CharField(max_length=100, default="")
+    detail = models.CharField(max_length=300, blank=True, default="")
 
     def __str__(self):
         return f"{self.common_name}({self.scientific_name})"
 
 class Photo(models.Model):
     photo_num = models.BigAutoField(primary_key=True)
-
-    # supabase 연동 시 수정 필요 
     image = models.ImageField(upload_to="uploads/")
 
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
@@ -65,12 +63,10 @@ class Photo(models.Model):
 # 관측 로그 = 사용자가 올린 사진 + 식별된 종 + 위치/시각 정보
 class Log(models.Model):
     num = models.BigAutoField(primary_key=True)
-
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='logs')
     photo = models.ForeignKey(Photo, on_delete=models.CASCADE, related_name='logs')
+    
     species = models.ForeignKey(Species, on_delete=models.SET_NULL, null=True, blank=True, related_name='logs')
-
-    # location = models.CharField(max_length=120, db_index=True, blank=True, default="")  # 역지오코딩된 위치명
 
     reg_date = models.DateTimeField(auto_now_add=True)
 

@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 # 각 종이 어떤 필드 가지는지 정의
 class FieldGuideSpeciesItemSerializer(serializers.Serializer):
-    species_id = serializers.IntegerField()
+    species_code = serializers.CharField()
     common_name = serializers.CharField()
     scientific_name = serializers.CharField()
     order = serializers.CharField()

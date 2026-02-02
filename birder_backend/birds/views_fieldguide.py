@@ -45,42 +45,40 @@ class FieldGuideView(APIView):
         species_list = list(
             species_qs.values("species_code", "common_name", "scientific_name", "order")
         )
-        species_ids = [s["species_code"] for s in species_list]
+        species_codes = [s["species_code"] for s in species_list]
 
         # 유저 로그 집계 (count, last_obs_date)
         agg = (
             Log.objects
-            .filter(user=user, species_id__in=species_ids)
-            .values("species_id")
+            .filter(user=user, species__species_code__in=species_codes)
+            .values("species__species_code")
             .annotate(
                 observation_count=Count("num"),
                 last_observed_at=Max("photo__obs_date"),
             )
         )
-        agg_map = {row["species_id"]: row for row in agg}
+        agg_map = {row["species__species_code"]: row for row in agg}
 
         # cover 이미지(최근 1장)용: species별 최신 log 1개를 가져와 photo.image 사용
         latest_logs = (
             Log.objects
-            .filter(user=user, species_id__in=species_ids)
-            .select_related("photo")
-            .order_by("species_id", "-photo__obs_date", "-reg_date", "-num")
+            .filter(user=user, species__species_code__in=species_codes)
+            .select_related("photo", "species")
+            .order_by("species__species_code", "-photo__obs_date", "-reg_date", "-num")
         )
 
         cover_map = {}
         for log in latest_logs:
-            sid = log.species_id
-            if sid in cover_map:
+            if not log.species:
+                continue
+            code = log.species.species_code
+            if code in cover_map:
                 continue
             photo = log.photo
-            if photo and getattr(photo, "image", None):
-                cover_map[sid] = request.build_absolute_uri(photo.image.url)
-            else:
-                cover_map[sid] = None
+            cover_map[code] = request.build_absolute_uri(photo.image.url) if (photo and getattr(photo, "image", None)) else None
 
         # Species 목록을 도감 카드로 아이템화, 목별 그룹핑
         grouped = defaultdict(list)
-
         for s in species_list:
             sid = s["species_code"]
             a = agg_map.get(sid) # 관측했으면 row 반환, 못했으면 None
@@ -91,11 +89,10 @@ class FieldGuideView(APIView):
             cover_image_url = cover_map.get(sid) if observed else None
 
             item = {
-                "species_id": sid,
+                "species_code": sid,
                 "common_name": s["common_name"],
                 "scientific_name": s.get("scientific_name") or "",
                 "order": s.get("order") or "",
-
                 "observed": observed,
                 "observation_count": observation_count,
                 "last_observed_at": last_observed_at,
@@ -126,6 +123,5 @@ class FieldGuideView(APIView):
 
         # order 그룹 정렬
         groups_payload.sort(key=lambda g: g["order"])
-
         out = FieldGuideOrderGroupSerializer(groups_payload, many=True)
         return Response({"groups": out.data})

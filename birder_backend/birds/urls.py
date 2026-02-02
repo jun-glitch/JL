@@ -27,7 +27,10 @@ urlpatterns = [
     # 지역명으로 종별 누적 관측 횟수
     path("areas/<str:area>/species/", AreaSummaryView.as_view(), name="area_summary"),
     # 특정 지역 + 종의 관측 로그 목록
-    path("areas/<str:area>/species/<int:species_id>/logs/", AreaSpeciesLogsView.as_view(), name="area_species_logs"),
+    path("areas/<str:area>/species/<str:species_code>/logs/", AreaSpeciesLogsView.as_view(), name="area_species_logs"),
+
+    # 종명으로 지역별 누적 관측 횟수
+    path("species/<str:species>/", SpeciesSummaryView.as_view(), name="species_summary"),
 
     # 종명으로 지역별 누적 관측 횟수
     path("species/<str:species>/", SpeciesSummaryView.as_view(), name="species_summary"),
@@ -43,7 +46,7 @@ urlpatterns = [
     path("fieldguide/", FieldGuideView.as_view(), name="fieldguide"),
 
     # 종 상세(슬라이드 + 로그)
-    path("species/<int:species_id>/observations/", SpeciesObservationsView.as_view(), name="species_observations"),
+    path("species/<str:species_code>/observations/", SpeciesObservationsView.as_view(), name="species_observations"),
     
     # 피크민st 지도 API v2
     path("map/v2/points/", MapPointsView.as_view(), name="map_points_v2"),

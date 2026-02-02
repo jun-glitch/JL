@@ -1,15 +1,22 @@
 from rest_framework import serializers
-from .models import BirdIdentifySession, BirdCandidate, Photo, Species, Log
-
 from decimal import Decimal, ROUND_HALF_UP
 from django.utils import timezone
 
+from .models import BirdIdentifySession, BirdCandidate, Photo, Species, Log
 from .utils.geocode import normalize_area_from_latlon
 
 class BirdCandidateSerializer(serializers.ModelSerializer):
     class Meta:
         model = BirdCandidate 
-        fields = ["id", "rank", "common_name_ko", "scientific_name", "short_description", "wikimedia_image_url", "confidence"]
+        fields = [
+            "id", 
+            "rank",
+            "common_name_ko",
+            "scientific_name",
+            "short_description",
+            "wikimedia_image_url",
+            "confidence",
+        ]
 
 class BirdIdentifySessionSerializer(serializers.ModelSerializer):
     candidates = BirdCandidateSerializer(many=True, read_only=True)
@@ -18,7 +25,7 @@ class BirdIdentifySessionSerializer(serializers.ModelSerializer):
         model = BirdIdentifySession
         fields = [
             "id",
-            "image_url"
+            "image_url",
             "current_index",
             "is_finished",
             "selected_candidate",
@@ -33,10 +40,10 @@ class UploadBirdPhotoSerializer(serializers.Serializer):
     obs_date = serializers.DateTimeField(required=False)
 
     # GPT api 넣으면 수정 필요
-    species_id = serializers.IntegerField(required=False, allow_null=True)
+    species_code = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
 class SpeciesSummarySerializer(serializers.Serializer):
-    species_id = serializers.IntegerField()
+    species_code = serializers.CharField()
     common_name = serializers.CharField()
     scientific_name = serializers.CharField()
     total_count = serializers.IntegerField()
@@ -57,7 +64,7 @@ class ObservationUploadSerializer(serializers.Serializer):
     longitude = serializers.FloatField(required=False, allow_null=True)
     obs_date = serializers.DateTimeField(required=False, allow_null=True)
 
-    species_id = serializers.IntegerField(required=False, allow_null=True)
+    species_code = serializers.CharField(required=False, allow_blank=True)
 
     def _round4_decimal(self, x: float) -> Decimal:
         return Decimal(str(x)).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
@@ -105,22 +112,21 @@ class ObservationUploadSerializer(serializers.Serializer):
 
         # 3) species 연결
         species = None
-        species_id = validated_data.get("species_id")
-        if species_id:
-            species = Species.objects.filter(pk=species_id).first()
-
+        species_code = validated_data.get("species_code")
+        if species_code:
+            species = Species.objects.filter(species_code=species_code).first()
+      
         # 4) Log 저장
         log = Log.objects.create(
             user=user,
             photo=photo,
             species=species,          
-            location=area_full or "", 
         )
 
         return {
-            "photo_num": photo.photo_num,
-            "log_id": getattr(log, "num", log.id),  # num pk 쓰는 경우 
-            "location": log.location,
+            "photo_num": getattr(photo, "photo_num", photo.id),
+            "log_id": getattr(log, "num", log.id),
+            "location": area_full or "",
             "obs_date": photo.obs_date,
             "latitude": float(photo.latitude) if photo.latitude is not None else None,
             "longitude": float(photo.longitude) if photo.longitude is not None else None,
