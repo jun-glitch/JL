@@ -48,7 +48,7 @@ class SignupView(APIView):
         serializer.is_valid(raise_exception=True)
 
         validated_data = serializer.validated_data
-        id = validated_data.get('id')
+        id = validated_data.get('username')
         email = validated_data.get('email')
         pwd = validated_data.get('password')
 
@@ -62,13 +62,16 @@ class SignupView(APIView):
             if not user : 
                 return Response({"detail" : "인증 계정 생성 실패"}, status=status.HTTP_400_BAD_REQUEST)
             
+            if not id or not email or not pwd:
+                return Response({"detail" : "정확한 정보를 입력하세요."}, status=status.HTTP_400_BAD_REQUEST)
+            
             birder_data = {
                 'id' : user.id,
                 'user_id' : id,
                 'user_email' : email,
                 'user_pwd' : pwd,
                 'enable' : 1,
-                'loaction_agree' : 1
+                'location_agree' : 1
             }
 
             db_response = supabase.table('birder').insert(birder_data).execute()
@@ -79,8 +82,8 @@ class SignupView(APIView):
                 "user_email" : email
             }, status=status.HTTP_201_CREATED)
 
-        except Exception:
-            return Response({"message" : "계정 생성 실패"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            return Response({"message" : f"계정 생성 실패: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # 로그인 API
 class LoginView(APIView):
