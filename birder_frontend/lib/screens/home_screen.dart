@@ -4,6 +4,7 @@ import 'package:birder_frontend/screens/birders_log_main.dart';
 import 'package:birder_frontend/screens/log_in.dart';
 import 'package:birder_frontend/screens/member_info_pages.dart';
 import 'package:birder_frontend/screens/my_log.dart';
+import 'package:birder_frontend/screens/search_result.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -11,6 +12,26 @@ import 'package:path/path.dart'  as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'saved_image_page.dart' as pages;
+import 'dart:typed_data';
+import 'package:flutter/services.dart' show rootBundle;
+
+
+// 임시 이미지 파일
+Future<File> _assetToTempFile(String assetPath, String fileName) async {
+  final ByteData bd = await rootBundle.load(assetPath);
+  final Uint8List bytes = bd.buffer.asUint8List();
+
+  final dir = await getTemporaryDirectory();
+  final file = File('${dir.path}/$fileName');
+  return file.writeAsBytes(bytes, flush: true);
+}
+
+Future<List<File>> _buildMockPhotos() async {
+  final f1 = await _assetToTempFile('assets/images/bird_photo1.webp', 'bird_photo1.webp');
+
+  return [f1]; // 1장만이면 [f1]
+}
+
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -112,6 +133,41 @@ class _HomeScreenState extends State<HomeScreen> {
                   fontSize: 60,
                   fontWeight: FontWeight.bold,
                   color: Colors.black,
+                ),
+              ),
+            ),
+          ),
+
+          // ✅ 임시 버튼 오버레이 (나중에 이 블록만 삭제하면 됨)
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 8, // 상태바 아래
+            right: 12,
+            child: SizedBox(
+              height: 34,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                onPressed: () async {
+                  final photos = await _buildMockPhotos();
+                  if (!context.mounted) return;
+
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => IdentifyOverlayPage(photos: photos),
+                    ),
+                  );
+                },
+                child: const Text(
+                  '임시',
+                  style: TextStyle(
+                    fontFamily: 'Paperlogy',
+                    fontWeight: FontWeight.w400,
+                    fontSize: 16,
+                  ),
                 ),
               ),
             ),
