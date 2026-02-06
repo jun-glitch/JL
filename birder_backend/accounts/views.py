@@ -6,6 +6,8 @@ from rest_framework import status
 from .models import UserSettings
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from integrations.supabase_client import supabase
+
 # 접근 권한 설정
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
@@ -45,14 +47,86 @@ class SignupView(APIView):
         # 문제 발생 시 400 에러 자동 반환
         serializer.is_valid(raise_exception=True)
 
-        # 검증 통과 시 User가 DB에 생성
-        user = serializer.save()
+        validated_data = serializer.validated_data
+        id = validated_data.get('id')
+        email = validated_data.get('email')
+        pwd = validated_data.get('password')
 
-        # 생성된 사용자 정보 반환(비밀번호 제외)
-        return Response(
-            {"id": user.id, "username": user.username, "email": user.email},
-            status=status.HTTP_201_CREATED,
-        )
+        try:
+            auth_response = supabase.auth.sign_up({
+                'email' : email,
+                'password' : pwd
+            })
+            user = auth_response.user
+
+            if not user : 
+                return Response({"detail" : "인증 계정 생성 실패"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            birder_data = {
+                'id' : user.id,
+                'user_id' : id,
+                'user_email' : email,
+                'user_pwd' : pwd,
+                'enable' : 1,
+                'loaction_agree' : 1
+            }
+
+            db_response = supabase.table('birder').insert(birder_data).execute()
+
+            return Response({
+                "message" : "회원가입 성공",
+                "user_id" : id,
+                "user_email" : email
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception:
+            return Response({"message" : "계정 생성 실패"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# 로그인 API
+class LoginView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        login_info = request.data
+
+        id = login_info.get('id')
+        pwd = login_info.get('pwd')
+
+        if not id or not pwd :
+            return Response({"message" : "이메일과 비밀번호를 모두 입력해주세요"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            birder_user_query = supabase.table('birder').select('id', 'user_id', 'user_pwd', 'user_email', 'enable', 'location_agree').eq('user_id', id).single().execute()
+            birder_user = birder_user_query.data
+
+            if not birder_user:
+                return Response({"message" : "올바르지 않은 로그인 정보입니다"}, status=status.HTTP_401_UNAUTHORIZED)
+            
+            if birder_user.get('enable') == 0:
+                return Response({"message" : "비활성화된 계정입니다"}, status=status.HTTP_401_UNAUTHORIZED)
+            
+            user_email = birder_user.get('user_email')
+
+            auth_response = supabase.auth.sign_in_with_password({
+                'email' : user_email,
+                'password' : pwd
+            })
+            session = auth_response.session
+
+            if not session :
+                return Response({"message" : "올바르지 않은 로그인 정보입니다"}, status=status.HTTP_401_UNAUTHORIZED)
+            
+            return Response({
+                "access_token" : session.access_token,
+                "refresh_token" : session.refresh_token,
+                "user" : {
+                    "id" : id,
+                    "email" : user_email,
+                    "location_agree" : birder_user.get('location_agree')
+                }
+            }, status=status.HTTP_200_OK)
+        except:
+            return Response({"message" : "로그인 실패"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # 현재 로그인한 사용자 정보 반환 API
 class MeView(APIView):
