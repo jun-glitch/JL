@@ -3,7 +3,6 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
-from .models import UserSettings
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from integrations.supabase_client import supabase
@@ -51,6 +50,7 @@ class SignupView(APIView):
         id = validated_data.get('username')
         email = validated_data.get('email')
         pwd = validated_data.get('password')
+        username = validated_data.get('name')
 
         try:
             auth_response = supabase.auth.sign_up({
@@ -68,8 +68,9 @@ class SignupView(APIView):
             birder_data = {
                 'id' : user.id,
                 'user_id' : id,
-                'user_email' : email,
                 'user_pwd' : pwd,
+                'user_name' : username,
+                'user_email' : email,
                 'enable' : 1,
                 'location_agree' : 1
             }
@@ -79,7 +80,8 @@ class SignupView(APIView):
             return Response({
                 "message" : "회원가입 성공",
                 "user_id" : id,
-                "user_email" : email
+                "user_email" : email,
+                "user_name": username
             }, status=status.HTTP_201_CREATED)
 
         except Exception as e:
@@ -103,7 +105,7 @@ class LoginView(APIView):
             birder_user = birder_user_query.data
 
             if not birder_user:
-                return Response({"message" : "올바르지 않은 로그인 정보입니다"}, status=status.HTTP_401_UNAUTHORIZED)
+                return Response({"message" : "올바르지 않은 로그인 정보입니다"}, status=status.HTTP_400_BAD_REQUEST)
             
             if birder_user.get('enable') == 0:
                 return Response({"message" : "비활성화된 계정입니다"}, status=status.HTTP_401_UNAUTHORIZED)
@@ -117,7 +119,7 @@ class LoginView(APIView):
             session = auth_response.session
 
             if not session :
-                return Response({"message" : "올바르지 않은 로그인 정보입니다"}, status=status.HTTP_401_UNAUTHORIZED)
+                return Response({"message" : "올바르지 않은 로그인 정보입니다"}, status=status.HTTP_400_BAD_REQUEST)
             
             return Response({
                 "access_token" : session.access_token,
@@ -237,21 +239,45 @@ class SetPwdView(APIView):
 class SettingsView(APIView):
     permission_classes = [IsAuthenticated]
 
-    # 설정 조회 및 수정
+    # 설정 조회
     def get(self, request):
         # 현재 로그인한 사용자의 설정 가져오기 
-        settings_obj, _ = UserSettings.objects.get_or_create(user=request.user)
-        serializer = UserSettingsSerializer(settings_obj)
-        return Response(serializer.data)
+        id = request.user.id # birder table pk
+
+        try:
+            response = supabase.table('birder').select('location_enable', 'user_id', 'user_email', 'user_name', 'updated_at').eq('id', id).single().execute()
+
+            if not response:
+                return Response({"message" : "유저를 찾을 수 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            return Response({
+                "data" : response.data
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"message" : f"설정 조회 실패: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     # 설정 수정
     def patch(self, request):
         # 현재 로그인한 사용자의 설정 가져오기 
-        settings_obj, _ = UserSettings.objects.get_or_create(user=request.user)
-        serializer = UserSettingsSerializer(settings_obj, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True) # 입력값 검증
-        serializer.save() # 검증 통과 시 DB에 변경사항 저장
-        return Response(serializer.data)
+        id = request.user.id # birder table pk
+
+        update_data = {} # 수정할 데이터
+        if 'location_enable' in request.data:
+            update_data['location_enable'] = request.data['location_enable']
+        
+        if not update_data:
+            return Response({"message" : "수정할 내용이 없습니다."}, status=status.HTTP_204_NO_CONTENT)
+        # updated_at 컬럼은 supabase 트리거로 컬럼이 update되는 경우 now()로 update하는 함수 설정
+
+        try:
+            response = supabase.table('birder').update(update_data).eq('id', id).execute()
+
+            return Response({
+                "message" : "설정이 성공적으로 수정되었습니다",
+                "updated_data" : response.data[0] if response.data else {}
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"message" : f"설정 수정 중 에러: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # 로그아웃 API        
 class LogoutView(APIView):

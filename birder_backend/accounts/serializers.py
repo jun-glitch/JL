@@ -1,7 +1,7 @@
-from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
-from .models import UserSettings
+
+from integrations.supabase_client import supabase
 
 class SignupSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=15) # 사용자 ID, 15자 이내로 제한
@@ -10,18 +10,20 @@ class SignupSerializer(serializers.Serializer):
     password_confirm = serializers.CharField(write_only=True, min_length=8) # DB에 저장되지 않음
 
     def validate_username(self, value):
-        if User.objects.filter(username=value).exists(): # 중복 확인
+        response = supabase.table('birder').select('user_id').eq('user_id', value).execute()
+        if response.data:
             raise serializers.ValidationError("이미 사용 중인 ID입니다.")
         return value
 
     def validate_email(self, value):
-        if User.objects.filter(email=value).exists(): # 중복 확인
+        response = supabase.table('birder').select('user_email').eq('user_email', value).execute()
+        if response.data:
             raise serializers.ValidationError("이미 사용 중인 이메일입니다.")
         return value
 
     def validate(self, attrs):
         pw = attrs.get("password")
-        pw2 = attrs.get("password_confirm")
+        pw2 = attrs.pop("password_confirm")
 
         # 비밀번호 일치 여부 확인
         if pw != pw2:
@@ -31,18 +33,11 @@ class SignupSerializer(serializers.Serializer):
         validate_password(pw)
         return attrs
 
-    def create(self, validated_data):
-        user = User.objects.create_user(
-            username=validated_data["username"],
-            email=validated_data["email"],
-            password=validated_data["password"],  # 비밀번호는 자동으로 해시 처리됨
-        )
-        UserSettings.objects.create(user=user)
-        return user
+class UserSettingsSerializer(serializers.Serializer):
+    location_enabled = serializers.IntegerField(min_value=0, max_value=1)
+    updated_at = serializers.DateTimeField(read_only=True)
 
-# UserSettings model의 Serializer
-class UserSettingsSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = UserSettings
-        fields = ["notifications_enabled", "location_enabled", "updated_at"]
-        read_only_fields = ["updated_at"]
+    def validate_location_enabled(self, value):
+        if value not in [0, 1]:
+            raise serializers.ValidationError("값은 0 또는 1이어야 합니다.")
+        return value
