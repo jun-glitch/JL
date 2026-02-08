@@ -60,10 +60,10 @@ class SignupView(APIView):
             user = auth_response.user
 
             if not user : 
-                return Response({"detail" : "인증 계정 생성 실패"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"message" : "인증 계정 생성 실패"}, status=status.HTTP_400_BAD_REQUEST)
             
             if not id or not email or not pwd:
-                return Response({"detail" : "정확한 정보를 입력하세요."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"message" : "정확한 정보를 입력하세요."}, status=status.HTTP_400_BAD_REQUEST)
             
             birder_data = {
                 'id' : user.id,
@@ -72,7 +72,7 @@ class SignupView(APIView):
                 'user_name' : username,
                 'user_email' : email,
                 'enable' : 1,
-                'location_agree' : 1
+                'location_enable' : 1
             }
 
             db_response = supabase.table('birder').insert(birder_data).execute()
@@ -95,13 +95,13 @@ class LoginView(APIView):
         login_info = request.data
 
         id = login_info.get('id')
-        pwd = login_info.get('pwd')
+        pwd = login_info.get('password')
 
         if not id or not pwd :
-            return Response({"message" : "이메일과 비밀번호를 모두 입력해주세요"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message" : "아이디와 비밀번호를 모두 입력해주세요"}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            birder_user_query = supabase.table('birder').select('id', 'user_id', 'user_pwd', 'user_email', 'enable', 'location_agree').eq('user_id', id).single().execute()
+            birder_user_query = supabase.table('birder').select('id', 'user_id', 'user_pwd', 'user_email', 'enable', 'location_enable').eq('user_id', id).single().execute()
             birder_user = birder_user_query.data
 
             if not birder_user:
@@ -127,11 +127,11 @@ class LoginView(APIView):
                 "user" : {
                     "id" : id,
                     "email" : user_email,
-                    "location_agree" : birder_user.get('location_agree')
+                    "location_enable" : birder_user.get('location_enable')
                 }
             }, status=status.HTTP_200_OK)
-        except:
-            return Response({"message" : "로그인 실패"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            return Response({"message" : f"로그인 실패: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # 현재 로그인한 사용자 정보 반환 API
 class MeView(APIView):
@@ -142,100 +142,105 @@ class MeView(APIView):
         u = request.user
 
         # 로그인한 사용자 정보 반환
-        return Response({"id": u.id, "username": u.username, "email": u.email})
+        return Response({"id": u.user_id, "username": u.user_name, "email": u.email})
 
 # 아이디 찾기
 class FindUsernameView(APIView):
     permission_classes = [AllowAny]
+
     def post(self, request):
         email = request.data.get('email') # 이메일 data 변수명 email로 보내기
 
         if not email: # 이메일을 입력하지 않은 경우 프론트에서 막아주기
-            return Response({"error" : "이메일을 입력해주세요."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message" : "이메일을 입력해주세요."}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            user = User.objects.get(email=email)
-            return Response({"username" : user.username}, status=status.HTTP_200_OK)
-        
-        except User.DoesNotExist:
-            return Response({"error" : "해당 이메일로 가입된 아이디가 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+            user_id = supabase.table('birder').select('user_id').eq('email', email).execute()
+            if user_id:
+                return Response({"user_id" : user_id}, status=status.HTTP_200_OK) 
+            else: 
+                return Response({"message" : "해당 이메일로 가입된 아이디가 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"message" : f"유저 검색 중 에러 발생: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # 비밀번호 찾기 기능에서 아이디, 이메일 확인 후 비밀번호 재설정 페이지 링크를 이메일로 전송
 class FindPwdView(APIView):
     permission_classes = [AllowAny]
     def post(self, request):
-        username = request.data.get('username') # id data 변수명 username
+        id = request.data.get('username') # id data 변수명 username
         email = request.data.get('email') # data 변수명 email
 
-        if not username: # 아이디 입력 안 한 경우 프론트에서 막아주기
-            return  Response({"error" : "아이디를 입력해주세요."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        if not email: # 이메일을 입력 안 한 경우 프론트에서 막아주기
-            return  Response({"error" : "이메일을 입력해주세요."}, status=status.HTTP_400_BAD_REQUEST)
+        if not id or not email: # 아이디 또는 이메일을 입력 안 한 경우 프론트에서 막아주기
+            return  Response({"message" : "아이디와 이메일을 정확히 입력해주세요."}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            user = User.objects.get(email=email, username=username)
+            user = supabase.table('birder').eq('user_id', id).eq('user_email', email).single().execute()
 
-            uid = urlsafe_base64_encode(force_bytes(user.pk))
-            token = default_token_generator.make_token(user)
-
-            reset_link = f"http://localhost:3000/change-pwd/{uid}/{token}"
-
-            send_mail(
-                '비밀번호 재설정 안내',
-                f'해당 링크를 클릭하여 비밀번호를 재설정하세요: {reset_link}',
-                'admin@test.com',
-                [email]
-            )
-            return Response({"message" : "이메일로 비밀번호 재설정 링크가 전송되었습니다. 도착하지 않은 경우 스팸메일함을 확인해주세요."}, status=status.HTTP_200_OK)
+            if not user:
+                return Response({"message" : "해당 정보로 가입된 계정이 없습니다."}, status=status.HTTP_404_NOT_FOUND)
             
-        except User.DoesNotExist:
-            return Response({"error" : "해당 정보로 가입된 계정이 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+            supabase.auth.reset_password_for_email(email, {"redirect_to" : "http://localhost:8000/api/auth/change-pwd/"})
+
+            return Response({
+                "message" : "이메일로 비밀번호 재설정 링크가 전송되었습니다. 도착하지 않은 경우 스팸메일함을 확인해주세요."
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({"message" : f"비밀번호 찾기 중 에러 발생: {str(e)}"}, status=status.HTTP_404_NOT_FOUND)
 
 # 로그인 상태에서 비밀번호 변경을 위한 본인 인증 > 비밀번호 재입력
 class CheckPwdView(APIView):
     permission_classes = [IsAuthenticated]
     def post(self, request):
-        user = request.user # 현재 로그인되어 있는 계정 가져오기
-        pwd = request.data.get('pwd')
+        email = request.user.email
+        pwd = request.data.get('password')
+        if not pwd:
+            return Response({"message" : "비밀번호를 입력해주세요."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            auth_response = supabase.auth.sign_in_with_password({
+                "email" : email,
+                "password" : pwd
+            })
 
-        if  user.check_password(pwd):
-            uid = urlsafe_base64_encode(force_bytes(user.pk)) # 현재 사용자의 pk 암호화
-            token = default_token_generator.make_token(user)
-            return Response({"uidb64" : uid, "token" : token}, status=status.HTTP_200_OK)
+            return Response({
+                "message" : "비밀번호 확인 완료",
+                "session" : {
+                    "access_token" : auth_response.session.access_token,
+                    "refresh_token" : auth_response.session.refresh_token
+                }
+            }, status=status.HTTP_200_OK)
 
-        return Response({"error" : "틀린 비밀번호입니다."}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"message" : "비밀번호가 일치하지 않습니다."}, status=status.HTTP_401_UNAUTHORIZED)
 
 # 새 비밀번호 변경 페이지 - 비밀번호 찾기, 변경 공동 페이지
 class SetPwdView(APIView):
-    permission_classes = [AllowAny] # 해당 화면에 들어온 사용자는 모두 가능
+    permission_classes = [IsAuthenticated]
     def post(self, request):
-        uidb64 = request.data.get('uidb64')
-        token = request.data.get('token') # 비밀번호 변경 > 본인 인증용 비밀번호 재확인 페이지에서 토큰 발행 // 비밀번호 찾기 > 본인 인증 후 이메일에 보낼 때 토큰 발행
-        new_pwd = request.data.get('new_pwd')
-        new_pwd_confirm = request.data.get('new_pwd_confirm')
+        new_pwd = request.data.get('new_password')
+        new_pwd_confirm = request.data.get('new_password_confirm')
         try:
-            uid = urlsafe_base64_decode(uidb64).decode() # 비밀번호 변경/찾기 할 때 사용된 user의 encode된 pk 받기
-            user = User.objects.get(pk=uid)
-            
-            # 발행된 토큰 유효성 검증
-            if not default_token_generator.check_token(user, token):
-                return Response({"error" : "링크의 유효기한이 만료되었습니다."}, status=800) # 800 error 발생 시 링크 만료 안내
-
             if new_pwd != new_pwd_confirm:
-                return Response({"error" : "새 비밀번호가 일치하지 않습니다"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"message" : "새 비밀번호가 일치하지 않습니다."}, status=status.HTTP_400_BAD_REQUEST)
             
-            validate_password(new_pwd, user)
+            validate_password(new_pwd)
 
-            user.set_password(new_pwd)
-            user.save()
-            update_session_auth_hash(request, user) # 로그인 상태 유지
+            supabase.auth.update_user({
+                "password" : new_pwd
+            })
 
-            return Response({"message" : "비밀번호가 성공적으로 변경되었습니다."}, status=status.HTTP_200_OK)
+            id = request.user.id
+            supabase.table('birder').update({"user_pwd" : new_pwd}).eq('id', id).execute()
+
+            # 현재 발급된 토큰 만료 모든 로그인된 계정 로그아웃 처리
+            supabase.auth.admin.sign_out(id)
+
+            return Response({"message" : "비밀번호가 성공적으로 변경되었습니다. 보안을 위해 다시 로그인해주세요."}, status=status.HTTP_200_OK)
         except Exception as e:
-            return Response({"error" : list(e.messages)})
+            return Response({"message" : f"비밀번호 재설정 중 에러 발생: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
- # 사용자 설정 조회 및 수정 API       
+ # 사용자 설정 조회 및 수정 API
 class SettingsView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -274,12 +279,12 @@ class SettingsView(APIView):
 
             return Response({
                 "message" : "설정이 성공적으로 수정되었습니다",
-                "updated_data" : response.data[0] if response.data else {}
+                "data" : response.data[0] if response.data else {}
             }, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"message" : f"설정 수정 중 에러: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-# 로그아웃 API        
+# 로그아웃 API
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -298,3 +303,24 @@ class LogoutView(APIView):
 
         # 성공 응답 반환
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+# 회원 탈퇴 API
+class WithdrawView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        id = request.user.id # birder table pk
+
+        # 사용자 가입 내역 삭제가 아닌 enable 컬럼에서 활성화 > 비활성화 상태로 변경
+        try:
+            response = supabase.table('birder').update({'enable': 0, 'location_enable' : 0}).eq('id', id).execute()
+
+            # supabase auth 영역에서 세션 만료 처리
+            supabase.auth.admin.update_user_by_id(id, {'user_metadata' : {'disabled' : True}})
+
+            return Response({
+                "message" : "탈퇴 처리를 성공적으로 마쳤습니다.",
+                "data" : response.data[0] if response.data else {}
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"message" : f"탈퇴 처리에 실패: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
