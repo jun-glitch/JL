@@ -1,4 +1,3 @@
-from urllib import request
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -11,27 +10,10 @@ from integrations.supabase_client import supabase
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
 # 회원가입 입력 검증용 Serializer
-from .serializers import SignupSerializer,UserSettingsSerializer
-
-# 회원 테이블 접근용 User
-from django.contrib.auth.models import User
-
-# 비밀번호 변경 후 로그아웃 방지
-from django.contrib.auth import update_session_auth_hash
+from .serializers import SignupSerializer
 
 # 가입 시 사용했던 비밀번호 유효성 검사
 from django.contrib.auth.password_validation import validate_password
-
-# pk encode, decode용
-from django.utils.http import urlsafe_base64_encode
-from django.utils.http import urlsafe_base64_decode
-from django.utils.encoding import force_bytes
-
-# token 발행
-from django.contrib.auth.tokens import default_token_generator
-
-# 메일 전송
-from django.core.mail import send_mail
 
 # 회원가입 API 뷰
 class SignupView(APIView):
@@ -94,7 +76,7 @@ class LoginView(APIView):
     def post(self, request):
         login_info = request.data
 
-        id = login_info.get('id')
+        id = login_info.get('username')
         pwd = login_info.get('password')
 
         if not id or not pwd :
@@ -212,7 +194,7 @@ class CheckPwdView(APIView):
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
-            return Response({"message" : "비밀번호가 일치하지 않습니다."}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({"message" : f"비밀번호 인증 중 에러 발생: {str(e)}"}, status=status.HTTP_401_UNAUTHORIZED)
 
 # 새 비밀번호 변경 페이지 - 비밀번호 찾기, 변경 공동 페이지
 class SetPwdView(APIView):
@@ -289,20 +271,13 @@ class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        refresh = request.data.get("refresh") # 프론트에서 전달한 refresh token 받기
-        
-        if not refresh:
-            return Response(
-                {"detail": "refresh token required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        access_token = request.auth
 
-        # refresh token 블랙리스트에 추가하여 무효화 -> 이후 이 토큰으로는 access 불가
-        token = RefreshToken(refresh)
-        token.blacklist()
-
-        # 성공 응답 반환
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        try:
+            supabase.auth.sign_out(access_token)
+            return Response({"message" : "로그아웃이 성공적으로 완료되었습니다."}, status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            return Response({"message" : f"로그아웃 중 에러 발생: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # 회원 탈퇴 API
 class WithdrawView(APIView):
@@ -324,3 +299,29 @@ class WithdrawView(APIView):
             }, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"message" : f"탈퇴 처리에 실패: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class TokenRefreshView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        # 프론트엔드에서 보낸 refresh_token을 가져옵니다.
+        refresh_token = request.data.get('refresh_token')
+
+        if not refresh_token:
+            return Response({"message": "refresh_token이 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Supabase Auth를 통해 세션 갱신 요청
+            auth_response = supabase.auth.refresh_session(refresh_token)
+            
+            new_session = auth_response.session
+
+            return Response({
+                "message" : "token이 성공적으로 재발행되었습니다.",
+                "access_token": new_session.access_token,
+                "refresh_token": new_session.refresh_token, # 갱신된 새로운 리프레시 토큰
+                "expires_in": new_session.expires_in
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({"message": f"토큰 갱신 실패: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
