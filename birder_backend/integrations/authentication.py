@@ -2,6 +2,8 @@ from rest_framework import authentication
 from rest_framework import exceptions
 from integrations.supabase_client import supabase
 
+from types import SimpleNamespace
+
 class SupabaseAuthentication(authentication.BaseAuthentication):
     def authenticate(self, request):
         # 헤더에서 Authorization: Bearer <token> 추출
@@ -30,11 +32,18 @@ class SupabaseAuthentication(authentication.BaseAuthentication):
             
             if user_data.get('enable') == 0:
                 raise exceptions.AuthenticationFailed('비활성화된 사용자입니다.')
-            user.location_enable = user_data.get('location_enable') # 위치정보제공동의 여부 동의: 1 비동의: 0
-            user.user_name = user_data.get('user_name') # 유저명
-            user.user_id = user_data.get('user_id') # 로그인 시 사용하는 id
 
-            return (user, token) # (request.user에 담길 값, request.auth에 담길 값)
+            custom_user = SimpleNamespace(
+                id=user.id,
+                email=user.email,
+                is_authenticated=True,
+                location_enable=user_data.get('location_enable'),
+                user_name=user_data.get('user_name'),
+                user_id=user_data.get('user_id'),
+                enable=user_data.get('enable')
+            )
+
+            return (custom_user, token) # (request.user에 담길 값, request.auth에 담길 값)
 
         except Exception as e:
             raise exceptions.AuthenticationFailed(f'인증 실패: {str(e)}')
