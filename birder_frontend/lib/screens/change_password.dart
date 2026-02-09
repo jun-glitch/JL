@@ -278,7 +278,6 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       newPasswordConfirm: _newPwConfirmCtrl.text.trim(),
     );
 
-    // ✅ 서버에서 sign_out 처리 → 프론트도 로그아웃 처리
     await prefs.setBool('isLoggedIn', false);
     await prefs.remove('accessToken');
     await prefs.remove('refreshToken');

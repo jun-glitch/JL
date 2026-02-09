@@ -119,6 +119,54 @@ class MemberInfoPage extends StatelessWidget {
                 children: [
                   TextButton(
                     onPressed: () async {
+                      final prefs = await SharedPreferences.getInstance();
+
+                      final refresh = prefs.getString('refresh_token');
+                      final access = prefs.getString('access_token');
+
+                      final auth = AuthApi('http://10.0.2.2:8000');
+
+                      try {
+                        if (access != null && access.isNotEmpty) {
+                          auth.setAccessToken(access);
+                        }
+
+                        if (refresh != null && refresh.isNotEmpty) {
+                          await auth.logout(refreshToken: refresh);
+                        }
+                      } catch (_) {
+
+                      }
+
+                      await prefs.setBool('isLoggedIn', false);
+                      await prefs.remove('username');
+                      await prefs.remove('email');
+                      await prefs.remove('name');
+                      await prefs.remove('accessToken');
+                      await prefs.remove('refreshToken');
+
+                      if (!context.mounted) return;
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (_) => const HomeScreen()),
+                            (_) => false,
+                      );
+                    },
+                    child:
+                    Text( '로그아웃',
+                      style: TextStyle(
+                        fontFamily: 'Paperlogy',
+                        fontWeight: FontWeight.w400,
+                        fontSize: 16,
+                        color: Colors.black54,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(width: 8),
+                  const Text('|', style: TextStyle(color: Colors.black54)),
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: () async {
                       // 탈퇴 확인
                       final ok = await showDialog<bool>(
                         context: context,
@@ -176,41 +224,6 @@ class MemberInfoPage extends StatelessWidget {
                         );
 
                         // 홈 화면으로 이동
-                        Navigator.of(context).pushAndRemoveUntil(
-                          MaterialPageRoute(builder: (_) => const HomeScreen()),
-                              (_) => false,
-                        );
-                      } catch (e) {
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(e.toString())),
-                        );
-                      }
-                    },
-                    child: Text(
-                      '회원탈퇴',
-                      style: TextStyle(
-                        fontFamily: 'Paperlogy',
-                        fontWeight: FontWeight.w400,
-                        fontSize: 16,
-                        color: Colors.black54,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(width: 8),
-                  const Text('|', style: TextStyle(color: Colors.black54)),
-                  const SizedBox(width: 8),
-                  TextButton(
-                    onPressed: () async {
-                      try {
-                        await onDeleteAccount();
-                        if (!context.mounted) return;
-
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('회원탈퇴가 완료되었습니다.')),
-                        );
-
                         Navigator.of(context).pushAndRemoveUntil(
                           MaterialPageRoute(builder: (_) => const HomeScreen()),
                               (_) => false,
