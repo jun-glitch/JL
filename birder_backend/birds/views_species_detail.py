@@ -42,10 +42,7 @@ class SpeciesObservationsView(APIView):
         for log in logs_qs:
             photo = log.photo
 
-            # supabase 연동 시 수정 필요
-            image_url = None
-            if photo and getattr(photo, "image", None):
-                image_url = request.build_absolute_uri(photo.image.url)
+            image_url = getattr(photo, "image_url", None) if photo else None
 
             items.append({
                 "log_id": getattr(log, "num", log.id),
