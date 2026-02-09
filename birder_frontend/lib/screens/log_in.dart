@@ -151,7 +151,7 @@ class _LoginPageState extends State<LoginPage> {
                             try {
                               final auth = AuthApi('http://10.0.2.2:8000');
 
-                              final data = await auth.login(id: id, password: pw);
+                              final data = await auth.login(username: id, password: pw);
 
                               final access = data['access']?.toString();
                               final refresh = data['refresh']?.toString();

@@ -40,11 +40,11 @@ class AuthApi {
 
   // 로그인
   Future<Map<String, dynamic>> login({
-    required String id,
+    required String username,
     required String password,
   }) async {
     final res = await _dio.post('/api/auth/login/', data: {
-      "id": id,
+      "username": username,
       "password": password,
     });
 
