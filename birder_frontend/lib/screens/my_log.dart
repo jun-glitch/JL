@@ -1,3 +1,4 @@
+import 'package:birder_frontend/screens/home_screen.dart';
 import 'package:birder_frontend/screens/my_log_details.dart';
 import 'package:birder_frontend/screens/my_log_map.dart';
 import 'package:flutter/material.dart';
@@ -87,6 +88,16 @@ class _MyLogPageState extends State<MyLogPage> {
       appBar: AppBar(
         backgroundColor: sky,
         elevation: 0,
+        leading: IconButton(
+        iconSize: 28,
+        icon: const Icon(Icons.arrow_back),
+        onPressed: () {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const HomeScreen()),
+                (route) => false,
+          );
+        },
+      ),
         title: Text(
           'Birder',
           style: GoogleFonts.lobster(

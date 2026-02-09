@@ -16,7 +16,7 @@ class SignupStepperPage extends StatefulWidget {
 
 class _SignupStepperPageState extends State<SignupStepperPage> {
   final Dio _dio = Dio(BaseOptions(
-    baseUrl: 'http://10.0.2.2:8000', // 안드로이드 에뮬레이터 기준
+    baseUrl: 'http://10.0.2.2:8000', // 안드로이드 에뮬레이터
     connectTimeout: const Duration(seconds: 5),
     receiveTimeout: const Duration(seconds: 10),
   ));

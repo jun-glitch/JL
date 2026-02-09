@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:birder_frontend/screens/my_log.dart';
 import 'package:flutter/material.dart';
 
 /// TODO: DB/서버에서 내려줄 후보 새 데이터 모델로 교체
@@ -83,7 +84,13 @@ class _IdentifyOverlayPageState extends State<IdentifyOverlayPage> {
       builder: (_) => _InfoDialog(
         message: "도감에 추가되었습니다",
         confirmText: "확인",
-        onConfirm: () => Navigator.of(context).pop(),
+        onConfirm: () {
+          Navigator.of(context).pop(); // 다이얼로그 닫기
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const MyLogPage()), // 도감 화면
+                (route) => false,
+          );
+        },
       ),
     );
   }
@@ -99,7 +106,10 @@ class _IdentifyOverlayPageState extends State<IdentifyOverlayPage> {
       builder: (_) => _InfoDialog(
         message: "좀 더 정확한 사진으로\n다시 시도해주세요\n(ㅜㅜ)",
         confirmText: "확인",
-        onConfirm: () => Navigator.of(context).pop(),
+        onConfirm: () {
+          Navigator.of(context).pop();
+          Navigator.of(context).pop();
+        },
       ),
     );
   }
@@ -136,9 +146,7 @@ class _IdentifyOverlayPageState extends State<IdentifyOverlayPage> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.black.withOpacity(0.10),
-                    Colors.black.withOpacity(0.25),
-                    Colors.black.withOpacity(0.55),
+                    Colors.black.withOpacity(0.75),
                   ],
                 ),
               ),

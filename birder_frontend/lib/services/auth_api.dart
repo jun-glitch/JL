@@ -28,9 +28,63 @@ class AuthApi {
     });
   }
 
-  // (선택) 아이디 중복 확인
+  // 아이디 중복 확인
   Future<bool> checkIdAvailable(String id) async {
     final res = await _dio.get('/api/auth/check-id/', queryParameters: {"id": id});
     return (res.data["available"] as bool?) ?? false;
   }
+
+  void setAccessToken(String accessToken) {
+    _dio.options.headers['Authorization'] = 'Bearer $accessToken';
+  }
+
+  // 로그인
+  Future<Map<String, dynamic>> login({
+    required String id,
+    required String password,
+  }) async {
+    final res = await _dio.post('/api/auth/login/', data: {
+      "id": id,
+      "password": password,
+    });
+
+    if (res.data is Map<String, dynamic>) {
+      return res.data as Map<String, dynamic>;
+    }
+    throw Exception('로그인 응답 형식이 올바르지 않습니다.');
+  }
+
+  // 로그아웃
+  Future<void> logout({
+    required String refreshToken
+  }) async {
+    await _dio.post('/api/auth/logout/', data: {
+      "refresh": refreshToken,
+    });
+  }
+
+  // 비밀번호 변경
+  Future<void> checkPassword({required String password}) async {
+    await _dio.post('/api/auth/check-pwd/', data: {
+      "password": password,
+    });
+  }
+
+  Future<void> changePassword({
+    required String newPassword,
+    required String newPasswordConfirm,
+  }) async {
+    await _dio.post('/api/auth/change-pwd/', data: {
+      "new_password": newPassword,
+      "new_password_confirm": newPasswordConfirm,
+    });
+  }
+
+  Future<Map<String, dynamic>> withdraw() async {
+    final res = await _dio.post('/api/auth/withdraw/');
+    return (res.data as Map).cast<String, dynamic>();
+  }
+
 }
+
+

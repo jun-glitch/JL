@@ -1,5 +1,11 @@
+import 'package:birder_frontend/services/auth_api.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dio/dio.dart';
+
+
+import 'package:birder_frontend/screens/log_in.dart';
 
 // 1) 현재 비밀번호 확인 화면
 class VerifyPasswordPage extends StatefulWidget {
@@ -23,11 +29,22 @@ class _VerifyPasswordPageState extends State<VerifyPasswordPage> {
   }
 
   Future<bool> _verifyCurrentPassword(String pw) async {
-    // TODO: 서버 확인
+    final prefs = await SharedPreferences.getInstance();
+    final access = prefs.getString('accessToken');
 
-    // 임시: 4글자 이상 통과
-    await Future.delayed(const Duration(milliseconds: 250));
-    return pw.trim().length >= 4;
+    if (access == null || access.isEmpty) {
+      throw Exception('로그인이 필요합니다. (토큰 없음)');
+    }
+
+    final api = AuthApi('http://10.0.2.2:8000');
+    api.setAccessToken(access);
+
+    try {
+      await api.checkPassword(password: pw.trim());
+      return true; // 200 → OK
+    } on DioException {
+      return false; // 401 등 → 틀림
+    }
   }
 
   Future<void> _submit() async {
@@ -49,9 +66,16 @@ class _VerifyPasswordPageState extends State<VerifyPasswordPage> {
         return;
       }
 
-      // 확인 후 변경 화면으로
+      // 확인 후 변경 화면으로 (현재 비밀번호 전달)
       Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const ChangePasswordPage()),
+        MaterialPageRoute(
+          builder: (_) => ChangePasswordPage(currentPassword: pw.trim()),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
       );
     } finally {
       if (!mounted) return;
@@ -104,7 +128,8 @@ class _VerifyPasswordPageState extends State<VerifyPasswordPage> {
             child: SafeArea(
               top: false,
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                padding:
+                const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 child: Form(
                   key: _formKey,
                   child: Column(
@@ -146,12 +171,17 @@ class _VerifyPasswordPageState extends State<VerifyPasswordPage> {
                             vertical: 14,
                           ),
                           suffixIcon: IconButton(
-                            onPressed: () => setState(() => _obscure = !_obscure),
-                            icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
+                            onPressed: () =>
+                                setState(() => _obscure = !_obscure),
+                            icon: Icon(_obscure
+                                ? Icons.visibility_off
+                                : Icons.visibility),
                           ),
                         ),
                         validator: (v) {
-                          if ((v ?? '').trim().isEmpty) return '현재 비밀번호를 입력해 주세요.';
+                          if ((v ?? '').trim().isEmpty) {
+                            return '현재 비밀번호를 입력해 주세요.';
+                          }
                           return null;
                         },
                       ),
@@ -172,7 +202,9 @@ class _VerifyPasswordPageState extends State<VerifyPasswordPage> {
                               ? const SizedBox(
                             width: 22,
                             height: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                            ),
                           )
                               : const Text(
                             '확인',
@@ -198,7 +230,8 @@ class _VerifyPasswordPageState extends State<VerifyPasswordPage> {
 
 // 2) 새 비밀번호 입력 화면
 class ChangePasswordPage extends StatefulWidget {
-  const ChangePasswordPage({super.key});
+  const ChangePasswordPage({super.key, required this.currentPassword});
+  final String currentPassword;
 
   @override
   State<ChangePasswordPage> createState() => _ChangePasswordPageState();
@@ -222,18 +255,36 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   }
 
   bool _isStrongEnough(String pw) {
-    // 원하는 정책으로 바꿔도 됨
     if (pw.length < 8) return false;
     final hasLetter = RegExp(r'[A-Za-z]').hasMatch(pw);
     final hasDigit = RegExp(r'\d').hasMatch(pw);
     return hasLetter && hasDigit;
   }
 
-  Future<void> _changePassword(String newPw) async {
-    // TODO: 서버에 비밀번호 변경 요청
-    // 예) await api.changePassword(newPassword: newPw);
 
-    await Future.delayed(const Duration(milliseconds: 300));
+  Future<void> _changePassword() async {
+    final prefs = await SharedPreferences.getInstance();
+    final access = prefs.getString('accessToken');
+
+    if (access == null || access.isEmpty) {
+      throw Exception('로그인이 필요합니다. (토큰 없음)');
+    }
+
+    final api = AuthApi('http://10.0.2.2:8000');
+    api.setAccessToken(access);
+
+    await api.changePassword(
+      newPassword: _newPwCtrl.text.trim(),
+      newPasswordConfirm: _newPwConfirmCtrl.text.trim(),
+    );
+
+    // ✅ 서버에서 sign_out 처리 → 프론트도 로그아웃 처리
+    await prefs.setBool('isLoggedIn', false);
+    await prefs.remove('accessToken');
+    await prefs.remove('refreshToken');
+    await prefs.remove('username');
+    await prefs.remove('email');
+    await prefs.remove('name');
   }
 
   Future<void> _submit() async {
@@ -242,15 +293,35 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
     setState(() => _loading = true);
     try {
-      await _changePassword(_newPwCtrl.text);
+      await _changePassword();
 
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('비밀번호가 변경되었습니다.')),
+        const SnackBar(content: Text('비밀번호가 변경되었습니다. 다시 로그인해주세요.')),
       );
 
-      // 변경 완료 후 이전 화면들로 복귀(원하면 pop 한 번만 해도 됨)
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+            (_) => false,
+      );
+    } on DioException catch (e) {
+      final msg = e.response?.data is Map
+          ? ((e.response?.data['message'] ??
+          e.response?.data['detail'] ??
+          '비밀번호 변경에 실패했습니다.')
+          .toString())
+          : '비밀번호 변경에 실패했습니다.';
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(msg)));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
     } finally {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -302,7 +373,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
             child: SafeArea(
               top: false,
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                padding:
+                const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 child: Form(
                   key: _formKey,
                   child: Column(
@@ -344,8 +416,11 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                             vertical: 14,
                           ),
                           suffixIcon: IconButton(
-                            onPressed: () => setState(() => _obscure1 = !_obscure1),
-                            icon: Icon(_obscure1 ? Icons.visibility_off : Icons.visibility),
+                            onPressed: () =>
+                                setState(() => _obscure1 = !_obscure1),
+                            icon: Icon(_obscure1
+                                ? Icons.visibility_off
+                                : Icons.visibility),
                           ),
                         ),
                         validator: (v) {
@@ -376,14 +451,19 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                             vertical: 14,
                           ),
                           suffixIcon: IconButton(
-                            onPressed: () => setState(() => _obscure2 = !_obscure2),
-                            icon: Icon(_obscure2 ? Icons.visibility_off : Icons.visibility),
+                            onPressed: () =>
+                                setState(() => _obscure2 = !_obscure2),
+                            icon: Icon(_obscure2
+                                ? Icons.visibility_off
+                                : Icons.visibility),
                           ),
                         ),
                         validator: (v) {
                           final confirm = (v ?? '').trim();
                           if (confirm.isEmpty) return '새 비밀번호 확인을 입력해 주세요.';
-                          if (confirm != _newPwCtrl.text.trim()) return '비밀번호가 일치하지 않아요.';
+                          if (confirm != _newPwCtrl.text.trim()) {
+                            return '비밀번호가 일치하지 않아요.';
+                          }
                           return null;
                         },
                       ),
@@ -404,7 +484,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                               ? const SizedBox(
                             width: 22,
                             height: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child:
+                            CircularProgressIndicator(strokeWidth: 2),
                           )
                               : const Text(
                             '비밀번호 변경',

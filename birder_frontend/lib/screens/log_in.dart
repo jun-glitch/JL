@@ -1,10 +1,11 @@
 import 'package:birder_frontend/screens/find_id.dart';
 import 'package:birder_frontend/screens/find_password.dart';
 import 'package:birder_frontend/screens/home_screen.dart';
+import 'package:birder_frontend/services/auth_api.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 
 import 'sign_up.dart';
 
@@ -137,20 +138,55 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         ),
                         onPressed: () async {
-                          final prefs = await SharedPreferences.getInstance();
+                            final id = _idCtrl.text.trim();
+                            final pw = _pwCtrl.text;
 
-                          // 로그인 성공 가정
-                          await prefs.setBool('isLoggedIn', true);
-                          await prefs.setString('username', _idCtrl.text.trim());
-                          await prefs.setString('email', _emailCtrl.text.trim());
-                          await prefs.setString('name', _nameCtrl.text.trim());
+                            if (id.isEmpty || pw.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('아이디/비밀번호를 입력해 주세요.')),
+                              );
+                              return;
+                            }
 
-                          if (!context.mounted) return;
+                            try {
+                              final auth = AuthApi('http://10.0.2.2:8000');
 
-                          // 메인 화면으로 이동
-                          Navigator.of(context).pushReplacement(
-                            MaterialPageRoute(builder: (_) => const HomeScreen()),
-                          );
+                              final data = await auth.login(id: id, password: pw);
+
+                              final access = data['access']?.toString();
+                              final refresh = data['refresh']?.toString();
+
+                              if (access == null || access.isEmpty) {
+                                throw Exception('토큰이 없습니다. 서버 응답을 확인해 주세요.');
+                              }
+
+                              final prefs = await SharedPreferences.getInstance();
+                              await prefs.setBool('isLoggedIn', true);
+                              await prefs.setString('accessToken', access);
+
+                              if (refresh != null && refresh.isNotEmpty) {
+                                await prefs.setString('refreshToken', refresh);
+                              }
+
+                              await prefs.setString('username', id);
+
+                              if (!context.mounted) return;
+                              Navigator.of(context).pushReplacement(
+                                MaterialPageRoute(builder: (_) => const HomeScreen()),
+                              );
+                            } on DioException catch (e) {
+                              final msg = e.response?.data is Map
+                                  ? ((e.response?.data['detail'] ??
+                                  e.response?.data['message'] ??
+                                  '로그인에 실패했습니다.')
+                                  .toString())
+                                  : '로그인에 실패했습니다.';
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+                            } catch (e) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(e.toString())),
+                              );
+                            }
                         },
                         child: const Text(
                           '로그인',
