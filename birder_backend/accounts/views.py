@@ -32,9 +32,12 @@ class SignupView(APIView):
         id = validated_data.get('username')
         email = validated_data.get('email')
         pwd = validated_data.get('password')
-        username = validated_data.get('name')
+        username = request.data.get('name')
 
         try:
+            if not id or not email or not pwd:
+                return Response({"message" : "정확한 정보를 입력하세요."}, status=status.HTTP_400_BAD_REQUEST)
+            
             auth_response = supabase.auth.sign_up({
                 'email' : email,
                 'password' : pwd
@@ -44,9 +47,6 @@ class SignupView(APIView):
             if not user : 
                 return Response({"message" : "인증 계정 생성 실패"}, status=status.HTTP_400_BAD_REQUEST)
             
-            if not id or not email or not pwd:
-                return Response({"message" : "정확한 정보를 입력하세요."}, status=status.HTTP_400_BAD_REQUEST)
-            
             birder_data = {
                 'id' : user.id,
                 'user_id' : id,
@@ -54,7 +54,7 @@ class SignupView(APIView):
                 'user_name' : username,
                 'user_email' : email,
                 'enable' : 1,
-                'location_enable' : 1
+                'location_enabled' : 1
             }
 
             db_response = supabase.table('birder').insert(birder_data).execute()

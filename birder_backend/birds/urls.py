@@ -10,10 +10,10 @@ from .views import (
     SpeciesMapPointsView,
     SpeciesMapRecordsView,
     ObservationUploadView,
-)   
+)
 from .views_fieldguide import FieldGuideView
 from .views_species_detail import SpeciesObservationsView
-from .views_map import MapPointsView, MapClustersView 
+from .views_map import MapPointsView, MapClustersView
 
 urlpatterns = [
     # 새 식별 관련 엔드포인트
