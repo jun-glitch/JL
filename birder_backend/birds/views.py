@@ -68,7 +68,7 @@ def extract_exif_data(image_file):
     return lat, lng, obs_date
 
 class IdentifyView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         # 1) 이미지 파일 받기
@@ -169,10 +169,10 @@ class IdentifyAnswerView(APIView):
             session.save()
            
             photo = Photo.objects.create(
-               image=session.image,
-               latitude=session.latitude,
-               longitude=session.longitude,
-               obs_date=session.obs_date,
+               image_url=session.image_url,
+               latitude=None,
+               longitude=None,
+               obs_date=timezone.now(),
             )
 
             location = "UNKNOWN"
@@ -301,12 +301,10 @@ class AreaSummaryView(APIView):
                 "photo:photo_num!inner(location)"
             ).ilike("photo.location", f"{area}%").execute()
 
+            logs = response.data or []
+        
             if not logs:
                 return Response([], status=status.HTTP_200_OK) # 검색된 로그가 없는 경우 빈 배열 전송
-
-            logs = response.data
-            
-            logs = response.data
 
             summary_dict = {}
             for entry in logs:
@@ -347,10 +345,9 @@ class SpeciesSummaryView(APIView):
             ).ilike("species_code", species_code).filter("photo.latitude", "not.is", "null"
             ).filter("photo.longitude", "not.is", "null").execute()
 
+            logs = response.data or []
             if not logs:
                 return Response([], status=status.HTTP_200_OK) # 검색된 로그가 없는 경우 빈 배열 전송
-            
-            logs = response.data
 
             first_entry = logs[0]
             species_info = first_entry.get('species')
@@ -404,7 +401,7 @@ class AreaSpeciesLogsView(APIView):
                 "obs_date": getattr(photo, "obs_date", None),
                 "latitude": float(photo.latitude) if photo and photo.latitude is not None else None,
                 "longitude": float(photo.longitude) if photo and photo.longitude is not None else None,
-                "image_url": request.build_absolute_uri(photo.image.url) if (photo and getattr(photo, "image", None)) else None,
+                "image_url": getattr(photo, "image_url", None) if photo else None,
             })
 
         out = LogItemSerializer(items, many=True)
@@ -512,7 +509,7 @@ class SpeciesMapRecordsView(APIView):
                 "area_full": getattr(photo, "area_full", ""),
                 "latitude": float(photo.latitude) if photo and photo.latitude is not None else None,
                 "longitude": float(photo.longitude) if photo and photo.longitude is not None else None,
-                "photo_url": request.build_absolute_uri(photo.image.url) if (photo and getattr(photo, "image", None)) else None,
+                "photo_url": getattr(photo, "image_url", None) if photo else None,
             })
 
         return Response({

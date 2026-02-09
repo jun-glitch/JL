@@ -75,8 +75,8 @@ class FieldGuideView(APIView):
             if code in cover_map:
                 continue
             photo = log.photo
-            cover_map[code] = request.build_absolute_uri(photo.image.url) if (photo and getattr(photo, "image", None)) else None
-
+            cover_map[code] = getattr(photo, "image_url", None)
+            
         # Species 목록을 도감 카드로 아이템화, 목별 그룹핑
         grouped = defaultdict(list)
         for s in species_list:

@@ -26,7 +26,7 @@ def get_top5_candidates_from_gpt(image_url: str) -> List[dict]:
     """
     client = OpenAI(api_key=getattr(settings, "OPENAI_API_KEY", None) or None)
 
-    model = getattr(settings, "OPENAI_MODEL", "gpt-4o-2024-08-06")
+    model = getattr(settings, "OPENAI_MODEL", "gpt-4o-mini")
 
     # Responses API: 이미지 입력은 content 배열에 input_image.
     # (OpenAI docs 형식) :contentReference[oaicite:8]{index=8}
