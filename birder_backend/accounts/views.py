@@ -83,7 +83,7 @@ class LoginView(APIView):
             return Response({"message" : "아이디와 비밀번호를 모두 입력해주세요"}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            birder_user_query = supabase.table('birder').select('id', 'user_id', 'user_pwd', 'user_email', 'enable', 'location_enable').eq('user_id', id).single().execute()
+            birder_user_query = supabase.table('birder').select('id', 'user_id', 'user_pwd', 'user_email', 'enable', 'location_enabled').eq('user_id', id).single().execute()
             birder_user = birder_user_query.data
 
             if not birder_user:
@@ -109,7 +109,7 @@ class LoginView(APIView):
                 "user" : {
                     "id" : id,
                     "email" : user_email,
-                    "location_enable" : birder_user.get('location_enable')
+                    "location_enable" : birder_user.get('location_enabled')
                 }
             }, status=status.HTTP_200_OK)
         except Exception as e:
@@ -232,7 +232,7 @@ class SettingsView(APIView):
         id = request.user.id # birder table pk
 
         try:
-            response = supabase.table('birder').select('location_enable', 'user_id', 'user_email', 'user_name', 'updated_at').eq('id', id).single().execute()
+            response = supabase.table('birder').select('location_enabled', 'user_id', 'user_email', 'user_name', 'updated_at').eq('id', id).single().execute()
 
             if not response:
                 return Response({"message" : "유저를 찾을 수 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
@@ -288,7 +288,7 @@ class WithdrawView(APIView):
 
         # 사용자 가입 내역 삭제가 아닌 enable 컬럼에서 활성화 > 비활성화 상태로 변경
         try:
-            response = supabase.table('birder').update({'enable': 0, 'location_enable' : 0}).eq('id', id).execute()
+            response = supabase.table('birder').update({'enable': 0, 'location_enabled' : 0}).eq('id', id).execute()
 
             # supabase auth 영역에서 세션 만료 처리
             supabase.auth.admin.update_user_by_id(id, {'user_metadata' : {'disabled' : True}})
