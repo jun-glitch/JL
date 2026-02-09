@@ -283,13 +283,14 @@ class WithdrawView(APIView):
 
     def post(self, request):
         id = request.user.id # birder table pk
+        access_token = request.auth
 
         # 사용자 가입 내역 삭제가 아닌 enable 컬럼에서 활성화 > 비활성화 상태로 변경
         try:
             response = supabase.table('birder').update({'enable': 0, 'location_enabled' : 0}).eq('id', id).execute()
 
             # supabase auth 영역에서 세션 만료 처리
-            supabase.auth.admin.update_user_by_id(id, {'user_metadata' : {'disabled' : True}})
+            supabase.auth.sign_out({"scope" : "global"})
 
             return Response({
                 "message" : "탈퇴 처리를 성공적으로 마쳤습니다.",
