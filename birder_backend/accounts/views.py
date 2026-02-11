@@ -214,7 +214,7 @@ class SetPwdView(APIView):
             supabase.table('birder').update({"user_pwd" : new_pwd}).eq('id', id).execute()
 
             # 현재 발급된 토큰 만료 모든 로그인된 계정 로그아웃 처리
-            supabase.auth.admin.sign_out(id)
+            supabase.auth.sign_out({"scope" : "global"})
 
             return Response({"message" : "비밀번호가 성공적으로 변경되었습니다. 보안을 위해 다시 로그인해주세요."}, status=status.HTTP_200_OK)
         except Exception as e:

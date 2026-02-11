@@ -37,7 +37,7 @@ class SupabaseAuthentication(authentication.BaseAuthentication):
                 id=user.id,
                 email=user.email,
                 is_authenticated=True,
-                location_enable=user_data.get('location_enable'),
+                location_enable=user_data.get('location_enabled'),
                 user_name=user_data.get('user_name'),
                 user_id=user_data.get('user_id'),
                 enable=user_data.get('enable')
