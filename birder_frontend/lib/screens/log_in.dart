@@ -89,7 +89,7 @@ class _LoginPageState extends State<LoginPage> {
                     // 아이디
                     TextField(
                       controller: _idCtrl,
-                      keyboardType: TextInputType.emailAddress,
+                      keyboardType: TextInputType.text,
                       decoration: InputDecoration(
                         hintText: '아이디',
                         filled: true,
@@ -153,8 +153,8 @@ class _LoginPageState extends State<LoginPage> {
 
                               final data = await auth.login(username: id, password: pw);
 
-                              final access = data['access']?.toString();
-                              final refresh = data['refresh']?.toString();
+                              final access = data['access_token']?.toString();
+                              final refresh = data['refresh_token']?.toString();
 
                               if (access == null || access.isEmpty) {
                                 throw Exception('토큰이 없습니다. 서버 응답을 확인해 주세요.');

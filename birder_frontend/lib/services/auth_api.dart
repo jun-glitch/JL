@@ -38,6 +38,7 @@ class AuthApi {
     _dio.options.headers['Authorization'] = 'Bearer $accessToken';
   }
 
+
   // 로그인
   Future<Map<String, dynamic>> login({
     required String username,
@@ -65,9 +66,18 @@ class AuthApi {
 
   // 비밀번호 변경
   Future<void> checkPassword({required String password}) async {
-    await _dio.post('/api/auth/check-pwd/', data: {
+    final res = await _dio.post('/api/auth/check-pwd/', data: {
       "password": password,
     });
+
+    if (res.data is Map<String, dynamic>) {
+      final session = res.data['session'];
+
+      final String access = session['access_token'];
+      final String refresh = session['refresh_token'];
+      setAccessToken(access);
+    }
+    throw Exception('로그인 응답 형식이 올바르지 않습니다.');
   }
 
   Future<void> changePassword({
@@ -80,10 +90,12 @@ class AuthApi {
     });
   }
 
+  // 회원 탈퇴
   Future<Map<String, dynamic>> withdraw() async {
     final res = await _dio.post('/api/auth/withdraw/');
     return (res.data as Map).cast<String, dynamic>();
   }
+
 
 }
 
