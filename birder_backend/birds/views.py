@@ -12,10 +12,10 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
-
+from rest_framework.parsers import MultiPartParser, FormParser
 from .models import BirdIdentifySession, BirdCandidate, Photo, Species, Log
 from .serializers import BirdCandidateSerializer, BirdIdentifySessionSerializer, UploadBirdPhotoSerializer, SpeciesSummarySerializer, LogItemSerializer, ObservationUploadSerializer 
-from .services.identify import gpt_top5_candidates, build_candidates_with_images
+from .services.identify import identify_bird 
 from .utils.geocode import normalize_area_from_latlon
 from .utils.supabase_storage import get_public_url
 
@@ -69,6 +69,7 @@ def extract_exif_data(image_file):
 
 class IdentifyView(APIView):
     permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
         # 1) 이미지 파일 받기
@@ -76,36 +77,36 @@ class IdentifyView(APIView):
         if not image:
             return Response({"detail": "image file required"}, status=status.HTTP_400_BAD_REQUEST)
         
-        # 2) 식별 세션 생성
+        session = BirdIdentifySession.objects.create(
+            user=request.user,
+            image_url=None,           
+            is_finished=False,
+            current_index=0,
+        )
+        try:
+            image.seek(0)
+            top5 = identify_bird(image)  
+        except Exception as e:
+            session.delete()
+            return Response({"detail": f"identify failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        normalized = []
+        for i, c in enumerate(top5[:5], start=1):
+            if isinstance(c, dict):
+                c_rank = c.get("rank", i)
+                normalized.append({**c, "rank": c_rank})
+            else:
+                normalized.append({"rank": i, "common_name_ko": str(c)})
+
         file_path = f"identify/{uuid.uuid4().hex}_{image.name}"
         image_bytes = image.read()
         image.seek(0)
 
-        upload_res = supabase.storage.from_("bird_photos").upload(
-            file_path,
-            image_bytes,
-            {"content-type": image.content_type or "image/jpeg"},
-        )
-
-        # 업로드 실패 방어
-        if getattr(upload_res, "error", None):
-            return Response({"detail": "supabase upload failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        image_url = get_public_url("bird_photos", file_path)
-        if not image_url:
-            return Response({"detail": "failed to get public url"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        session = BirdIdentifySession.objects.create(user=request.user, image_url=image_url)
-        
-        # 3) Top5 후보 생성
-        top5 = gpt_top5_candidates(session.image_url)
-        top5 = build_candidates_with_images(top5)
-
         # 4) 후보 DB 저장
-        for c in top5:
+        for c in normalized:
             BirdCandidate.objects.create(
                 session=session,
-                rank=c["rank"],
+                rank=c.get("rank", 0),
                 common_name_ko=c["common_name_ko"],
                 scientific_name=c.get("scientific_name", ""),
                 short_description=c.get("short_description", ""),
@@ -144,6 +145,7 @@ class IdentifyNextView(APIView):
 # 사용자가 후보 새에 대해 처리하는 view
 class IdentifyAnswerView(APIView):
     permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request, session_id: int):
         session = get_object_or_404(BirdIdentifySession, id=session_id, user=request.user)
@@ -164,25 +166,63 @@ class IdentifyAnswerView(APIView):
 
         # answer == "yes" → 확정
         if answer == "yes":
+            image = request.FILES.get("image")
+            if not image:
+                return Response(
+                    {
+                        "detail": "image file required to confirm (reupload)",
+                        "reupload_required": True,
+                        "is_finished": False,
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            lat, lng, obs_date = extract_exif_data(image)
+            image.seek(0)
+
+            try:
+                file_path = f"identify_confirm/{uuid.uuid4().hex}_{image.name}"
+                image_bytes = image.read()
+                image.seek(0)
+
+                upload_res = supabase.storage.from_("bird_photos").upload(
+                    file_path,
+                    image_bytes,
+                    {"content-type": image.content_type or "image/jpeg"},
+                )
+                if getattr(upload_res, "error", None):
+                    return Response({"detail": "supabase upload failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+                image_url = get_public_url("bird_photos", file_path)
+                if not image_url:
+                    return Response({"detail": "failed to get public url"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            except Exception as e:
+                return Response({"detail": f"storage upload failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            
             session.selected_candidate = current_candidate
             session.is_finished = True
+            session.image_url = image_url  
+            session.latitude = lat
+            session.longitude = lng
             session.save()
-           
+
             photo = Photo.objects.create(
-               image_url=session.image_url,
-               latitude=None,
-               longitude=None,
-               obs_date=timezone.now(),
+                image_url=image_url,
+                latitude=lat,
+                longitude=lng,
+                obs_date=obs_date or timezone.now(),
             )
 
             location = "UNKNOWN"
-            if session.latitude is not None and session.longitude is not None:
+            if lat is not None and lng is not None:
                 try:
-                    location = normalize_area_from_latlon(float(session.latitude), float(session.longitude))
+                    location = normalize_area_from_latlon(float(lat), float(lng))
                 except Exception:
                     location = "UNKNOWN"
 
-            log = Log.objects.create(
+            Log.objects.create(
                 user=request.user,
                 photo=photo,
                 species=current_candidate.species,
@@ -192,10 +232,10 @@ class IdentifyAnswerView(APIView):
             return Response({
                 "detail": "selected",
                 "selected": BirdCandidateSerializer(current_candidate).data,
+                "image_url": image_url,
                 "is_finished": True,
             })
-
-        # answer == "no" → 다음 후보로
+        
         session.current_index += 1
 
         if session.current_index >= total:
@@ -206,7 +246,7 @@ class IdentifyAnswerView(APIView):
                 "is_finished": True,
                 "reupload_required": True,
                 "next_index": session.current_index,
-        })
+            })
 
         session.save()
         return Response({
