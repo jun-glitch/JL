@@ -37,13 +37,9 @@ def normalize_candidates(candidates: Any) -> List[Dict[str, Any]]:
 def identify_bird(image_file) -> List[Dict[str, Any]]:
     try:
         base64_image = encode_image_to_base64(image_file)
-
-        # GPT 호출
+        mime_type = getattr(image_file, "content_type", None) or "image/jpeg"
         candidates = identify_with_gpt(base64_image)
-
-        # 결과 정리
         return normalize_candidates(candidates)
 
     except Exception:
-        # GPT 호출 실패 또는 이미지 처리 실패 시 빈 리스트 반환
         return []

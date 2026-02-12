@@ -20,16 +20,11 @@ class IdentifyResult(BaseModel):
 
 # 2) GPT 호출 함수
 def get_top5_candidates_from_gpt(image_url: str) -> List[dict]:
-    """
-    Supabase public URL을 GPT로 전달하여
-    Top5 후보를 JSON으로 받습니다.
-    """
+
     client = OpenAI(api_key=getattr(settings, "OPENAI_API_KEY", None) or None)
 
     model = getattr(settings, "OPENAI_MODEL", "gpt-4o-mini")
 
-    # Responses API: 이미지 입력은 content 배열에 input_image.
-    # (OpenAI docs 형식) :contentReference[oaicite:8]{index=8}
     response = client.responses.parse(
         model=model,
         input=[
@@ -49,7 +44,7 @@ def get_top5_candidates_from_gpt(image_url: str) -> List[dict]:
                 ],
             },
         ],
-        text_format=IdentifyResult,  # Pydantic 기반 Structured Outputs
+        text_format=IdentifyResult,  
     )
 
     parsed: IdentifyResult = response.output_parsed
@@ -66,3 +61,11 @@ def get_top5_candidates_from_gpt(image_url: str) -> List[dict]:
             }
         )
     return out
+
+def identify_with_gpt(base64_image: str, mime_type: str = "image/jpeg") -> List[dict]:
+   
+    if not base64_image:
+        return []
+
+    data_url = f"data:{mime_type};base64,{base64_image}"
+    return get_top5_candidates_from_gpt(data_url)
