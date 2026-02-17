@@ -231,21 +231,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => MemberInfoPage(
-                      username: username,
-                      email: email,
-                      name: name,
-                      onLogout: () async {
-                        final prefs = await SharedPreferences.getInstance();
-                        await prefs.setBool('isLoggedIn', false);
-                        await prefs.remove('username');
-                        await prefs.remove('email');
-                        await prefs.remove('name');
-                      },
-                      onDeleteAccount: () async {
-                        // TODO: 탈퇴 API 호출
-                      },
-                    ),
+                    builder: (_) => MemberInfoPage(),
                   ),
                 );
               }

@@ -1,6 +1,8 @@
+import 'package:birder_frontend/models/api_client.dart';
 import 'package:birder_frontend/models/bird.dart';
 import 'package:birder_frontend/models/observation.dart';
 import 'package:birder_frontend/screens/my_log_map.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -24,7 +26,7 @@ class _MyLogDetailsState extends State<MyLogDetails> {
   @override
   void initState() {
     super.initState();
-    _future = _fetchDetail(widget.bird.id);
+    _future = _fetchDetail(widget.bird.speciesCode);
 
   }
 
@@ -34,31 +36,62 @@ class _MyLogDetailsState extends State<MyLogDetails> {
     super.dispose();
   }
 
-  // ✅ TODO: 서버 DB 연결 후 수정 필요
-  Future<_DetailData> _fetchDetail(int birdId) async {
-    await Future.delayed(const Duration(milliseconds: 600));
+  Future<_DetailData> _fetchDetail(String speciesCode) async {
+    final dio = ApiClient().dio;
 
-    // 서버에서 받아온다고 가정: 사진 URL/기록 리스트
+    final res = await dio.get(
+      '/api/birds/species/$speciesCode/observations/',
+    );
+
+    // 토큰을 헤더에
+    final data = res.data as Map<String, dynamic>;
+
+    final species = (data['species'] as Map<String, dynamic>? ?? {});
+    final scientificName = (species['scientific_name'] ?? '').toString();
+
+    final List photosRaw = (data['photos'] as List? ?? const []);
+    final List<_PhotoItem> photoItems = photosRaw.map((e) {
+      final m = e as Map<String, dynamic>;
+
+      final imageUrl = (m['image_url'] ?? '').toString();
+
+      final obsDateRaw = m['obs_date']?.toString();
+      final obsDate = (obsDateRaw != null) ? DateTime.tryParse(obsDateRaw) : null;
+
+      final areaFull = (m['area_full'] ?? '').toString();
+
+      final lat = (m['latitude'] is num) ? (m['latitude'] as num).toDouble() : null;
+      final lng = (m['longitude'] is num) ? (m['longitude'] as num).toDouble() : null;
+
+      return _PhotoItem(
+        imageUrl: imageUrl,
+        obsDate: obsDate,
+        areaFull: areaFull,
+        latitude: lat,
+        longitude: lng,
+      );
+    }).where((p) => p.imageUrl.isNotEmpty).toList();
+
+    // 슬라이드 사진
+    final photoUrls = photoItems.map((p) => p.imageUrl).toList();
+
+    // 관측표
+    final observations = photoItems.map((p) {
+      final coordText = (p.latitude != null && p.longitude != null)
+          ? '${p.latitude!.toStringAsFixed(5)}, ${p.longitude!.toStringAsFixed(5)}'
+          : '';
+
+      return Observation(
+        locationText: p.areaFull.isNotEmpty ? p.areaFull : '-',
+        coordText: coordText.isNotEmpty ? coordText : '-',
+        observedAt: p.obsDate ?? DateTime.now(),
+      );
+    }).toList();
+
     return _DetailData(
-      photos: const [
-        // 서버 URL이면 NetworkImage로 렌더됨
-        'https://picsum.photos/800/800?1',
-        'https://picsum.photos/800/800?2',
-        'https://picsum.photos/800/800?3',
-      ],
-      observations: [
-        Observation(
-          locationText: '서울특별시 송파구',
-          coordText: '15°N 135°W',
-          observedAt: DateTime(2025, 9, 29, 16, 12, 11),
-        ),
-        Observation(
-          locationText: '대구광역시 수성구',
-          coordText: '17°N 130°W',
-          observedAt: DateTime(2025, 9, 26, 14, 27, 56),
-        ),
-      ],
-      scientificName: 'Alcedo atthis',
+      photos: photoUrls,
+      observations: observations,
+      scientificName: scientificName.isNotEmpty ? scientificName : (widget.bird.scientificName ?? ''),
     );
   }
 
@@ -333,7 +366,7 @@ class _ObservationTable extends StatelessWidget {
 }
 
 class _DetailData {
-  final List<String> photos; // 사진 URL들
+  final List<String> photos;
   final List<Observation> observations;
   final String scientificName;
 
@@ -341,5 +374,21 @@ class _DetailData {
     required this.photos,
     required this.observations,
     required this.scientificName,
+  });
+}
+
+class _PhotoItem {
+  final String imageUrl;
+  final DateTime? obsDate;
+  final String areaFull;
+  final double? latitude;
+  final double? longitude;
+
+  const _PhotoItem({
+    required this.imageUrl,
+    required this.obsDate,
+    required this.areaFull,
+    required this.latitude,
+    required this.longitude,
   });
 }

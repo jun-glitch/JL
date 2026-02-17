@@ -5,24 +5,39 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class MemberInfoPage extends StatelessWidget {
+class MemberInfoPage extends StatefulWidget {
   const MemberInfoPage({
     super.key,
-    required this.username,
-    required this.email,
-    required this.name,
-    required this.onLogout,
-    required this.onDeleteAccount,
     this.onChangePassword,
   });
 
-  final String username;
-  final String email;
-  final String name;
-
-  final Future<void> Function() onLogout;
-  final Future<void> Function() onDeleteAccount;
   final VoidCallback? onChangePassword;
+
+  @override
+  State<MemberInfoPage> createState() => _MemberInfoPageState();
+}
+
+class _MemberInfoPageState extends State<MemberInfoPage> {
+  String username = '';
+  String email = '';
+  String name = '';
+  bool loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      username = prefs.getString('username') ?? '';
+      name = prefs.getString('name') ?? '';
+      email = prefs.getString('email') ?? '';
+      loading = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -72,11 +87,9 @@ class MemberInfoPage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _InfoRow(label: '이름', value: name),
-                    const SizedBox(height: 15),
-                    _InfoRow(label: '아이디', value: username),
-                    const SizedBox(height: 15),
-                    _InfoRow(label: '이메일', value: email),
+                    _InfoRow(label: '이름', value: name.isEmpty ? '-' : name),
+                    _InfoRow(label: '아이디', value: username.isEmpty ? '-' : username),
+                    _InfoRow(label: '이메일', value: email.isEmpty ? '-' : email),
                   ],
                 ),
               ),
@@ -95,7 +108,7 @@ class MemberInfoPage extends StatelessWidget {
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  onPressed: onChangePassword ?? () {
+                  onPressed: widget.onChangePassword ?? () {
                     Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const VerifyPasswordPage()),
                   );
@@ -121,8 +134,8 @@ class MemberInfoPage extends StatelessWidget {
                     onPressed: () async {
                       final prefs = await SharedPreferences.getInstance();
 
-                      final refresh = prefs.getString('refresh_token');
-                      final access = prefs.getString('access_token');
+                      final refresh = prefs.getString('refreshToken');
+                      final access = prefs.getString('accessToken');
 
                       final auth = AuthApi('http://10.0.2.2:8000');
 

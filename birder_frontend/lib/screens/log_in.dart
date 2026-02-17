@@ -160,6 +160,16 @@ class _LoginPageState extends State<LoginPage> {
                                 throw Exception('토큰이 없습니다. 서버 응답을 확인해 주세요.');
                               }
 
+
+                              final Map<String, dynamic> user =
+                              (data['user'] is Map) ? Map<String, dynamic>.from(data['user']) : {};
+
+                              final String userId = (user['id'] ?? id).toString();
+
+                              final String userEmail = (user['email'] ?? '').toString();
+
+                              final String userName = '';
+
                               final prefs = await SharedPreferences.getInstance();
                               await prefs.setBool('isLoggedIn', true);
                               await prefs.setString('accessToken', access);
@@ -168,7 +178,10 @@ class _LoginPageState extends State<LoginPage> {
                                 await prefs.setString('refreshToken', refresh);
                               }
 
-                              await prefs.setString('username', id);
+                              await prefs.setString('username', userId);
+                              await prefs.setString('email', userEmail);
+                              await prefs.setString('name', userName);
+
 
                               if (!context.mounted) return;
                               Navigator.of(context).pushReplacement(

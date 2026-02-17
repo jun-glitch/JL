@@ -13,23 +13,77 @@ class BirdTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 아직 이미지 연결 X
-    final canOpen = bird.discovered; // 필요 없으면 false로
+    final canOpen = bird.discovered; // observed
+    final hasImage = (bird.imageUrl != null && bird.imageUrl!.isNotEmpty);
 
     return Column(
       children: [
         InkWell(
-          onTap: canOpen ? onOpenDetail : null, // 발견된 경우만 이동
+          onTap: canOpen ? onOpenDetail : null,
           child: AspectRatio(
-            aspectRatio: 1, // 정사각형
+            aspectRatio: 1,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: Container(
-                color: Colors.grey.shade300, // 회색 상자
-                alignment: Alignment.center,
-                child: canOpen
-                    ? const Icon(Icons.check_circle_outline) // 발견 표시 임시
-                    : const SizedBox.shrink(),
+                color: Colors.grey.shade300,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // 이미지 표시
+                    if (hasImage)
+                      Image.network(
+                        bird.imageUrl!,
+                        fit: BoxFit.cover,
+                        // 로딩 중
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return const Center(
+                            child: SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          );
+                        },
+                        // 에러나면 기본 아이콘
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Center(
+                            child: Icon(Icons.broken_image, size: 28),
+                          );
+                        },
+                      )
+                    else
+                    // 이미지 없으면 빈 아이콘
+                      const Center(
+                        child: Icon(Icons.image_not_supported, size: 28),
+                      ),
+
+                    // 발견한 새 체크
+                    if (canOpen)
+                      Positioned(
+                        top: 6,
+                        right: 6,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.85),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.check_circle,
+                            size: 18,
+                            color: Color(0xFF7FAFFF),
+                          ),
+                        ),
+                      ),
+
+                    // 발견 안 한 새 반투명
+                    if (!canOpen)
+                      Container(
+                        color: Colors.white.withOpacity(0.55),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),

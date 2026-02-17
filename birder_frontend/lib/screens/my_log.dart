@@ -1,6 +1,8 @@
+import 'package:birder_frontend/models/api_client.dart';
 import 'package:birder_frontend/screens/home_screen.dart';
 import 'package:birder_frontend/screens/my_log_details.dart';
 import 'package:birder_frontend/screens/my_log_map.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:birder_frontend/screens/bird_tile.dart';
@@ -14,57 +16,47 @@ class MyLogPage extends StatefulWidget {
 }
 
 class _MyLogPageState extends State<MyLogPage> {
-  late List<Bird> birds;
-  late List<BirdOrder> orders;
+  List<Bird> birds = const [];
+  List<BirdOrder> orders = const [];
+  late Future<List<BirdOrder>> _ordersFuture;
 
   // 검색 상태
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
 
+
+  Future<List<BirdOrder>> _fetchOrders() async {
+    final dio = ApiClient().dio;
+
+    final res = await dio.get('/api/birds/fieldguide/');
+
+
+    final List groups = res.data['groups'];
+
+    return groups.map((g) {
+      final items = (g['items'] as List)
+          .map((e) => Bird.fromFieldGuideJson(e))
+          .toList();
+
+      return BirdOrder(
+        name: g['order'],
+        birds: items,
+      );
+    }).toList();
+  }
+
   @override
   void initState() {
     super.initState();
+    _ordersFuture = _fetchOrders();
 
-    // 임시 DB
-    orders = [
-      BirdOrder(
-        name: '기러기목',
-        birds: [
-          Bird(id: 1, name: '가창오리', discovered: true, imagePath: '...'),
-          Bird(id: 2, name: '흰뺨오리'),
-          Bird(id: 3, name: '청둥오리', discovered: true, imagePath: '...'),
-          Bird(id: 4, name: '황오리'),
-          Bird(id: 5, name: '기러기'),
-          Bird(id: 6, name: '원앙'),
-          Bird(id: 7, name: '고니'),
-          Bird(id: 8, name: '큰기러기'),
-        ],
-      ),
-      BirdOrder(
-        name: '파랑새목',
-        birds: [
-          Bird(id: 101, name: '물총새', discovered: true, imagePath: '...'),
-          Bird(id: 102, name: '???'),
-          Bird(id: 103, name: '???'),
-          Bird(id: 104, name: '파랑새'),
-        ],
-      ),
-      BirdOrder(
-        name: '어쩌고목',
-        birds: [
-          Bird(id: 201, name: '물총새', discovered: true, imagePath: '...'),
-          Bird(id: 202, name: '???'),
-          Bird(id: 203, name: '???'),
-          Bird(id: 204, name: '파랑새'),
-          Bird(id: 205, name: '???'),
-          Bird(id: 206, name: '파랑새'),
-          Bird(id: 207, name: '???'),
-          Bird(id: 208, name: '파랑새'),
-        ],
-      ),
-    ];
-
-    birds = orders.expand((o) => o.birds).toList();
+    _ordersFuture.then((data) {
+      if (!mounted) return;
+      setState(() {
+        orders = data;
+        birds = orders.expand((o) => o.birds).toList();
+      });
+    });
   }
 
   @override
@@ -79,9 +71,10 @@ class _MyLogPageState extends State<MyLogPage> {
 
     final bool searching = _query.trim().isNotEmpty;
 
-    final List<Bird> filtered = !searching
+    final q = _query.trim().toLowerCase();
+    final List<Bird> filtered = q.isEmpty
         ? const []
-        : birds.where((b) => b.name.contains(_query.trim())).toList();
+        : birds.where((b) => b.name.toLowerCase().contains(q)).toList();
 
     return Scaffold(
       backgroundColor: sky,
@@ -171,7 +164,7 @@ class _MyLogPageState extends State<MyLogPage> {
                       onTapBird: (b) => _openDetailIfEnabled(b),
                     );
                   },
-                  childCount: orders.length,
+                  childCount : orders.length,
                 ),
               ),
             ),
@@ -241,7 +234,7 @@ class _MyLogPageState extends State<MyLogPage> {
 
   // 발견된 경우에만 상세 이동
   void _openDetailIfEnabled(Bird bird) {
-    final enabled = bird.discovered && (bird.imagePath?.isNotEmpty ?? false);
+    final enabled = bird.discovered && (bird.imageUrl?.isNotEmpty ?? false);
 
     if (!enabled) {
       ScaffoldMessenger.of(context).showSnackBar(
