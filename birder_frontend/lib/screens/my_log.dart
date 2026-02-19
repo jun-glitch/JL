@@ -25,24 +25,52 @@ class _MyLogPageState extends State<MyLogPage> {
   String _query = '';
 
 
-  Future<List<BirdOrder>> _fetchOrders() async {
+  Future<List<BirdOrder>> _fetchOrders({String? kwd}) async {
     final dio = ApiClient().dio;
+    final trimmed = (kwd ?? '').trim();
+    final res = await dio.get(
+      '/api/birds/fieldguide/',
+      queryParameters: trimmed.isEmpty ? null : {'kwd': trimmed},
+    );
 
-    final res = await dio.get('/api/birds/fieldguide/');
+    //debugPrint('status=${res.statusCode}');
+    //debugPrint('body=${res.data}');
+    //debugPrint('realUri=${res.realUri}');
+    //debugPrint('groups len=${(res.data['groups'] as List).length}');
 
 
-    final List groups = res.data['groups'];
+    final data = res.data;
+    if (data is! Map) return [];
 
-    return groups.map((g) {
-      final items = (g['items'] as List)
-          .map((e) => Bird.fromFieldGuideJson(e))
-          .toList();
+    final orderListRaw = data['order_list'];
+    final speciesListRaw = data['species_data'];
+    if (orderListRaw is! List) return [];
 
-      return BirdOrder(
-        name: g['order'],
-        birds: items,
-      );
-    }).toList();
+    final orders = <BirdOrder>[];
+
+    for (final orderNameRaw in orderListRaw) {
+      final orderName = orderNameRaw.toString();
+
+      final itemsRaw = speciesListRaw[orderName];
+      final birds = <Bird>[];
+
+      if (itemsRaw is List) {
+        for (final it in itemsRaw) {
+          if (it is Map) {
+            birds.add(
+              Bird.fromFieldGuideJson(
+                Map<String, dynamic>.from(it),
+                orderName: orderName,
+              ),
+            );
+          }
+        }
+      }
+
+      orders.add(BirdOrder(name: orderName, birds: birds));
+    }
+
+    return orders;
   }
 
   @override
@@ -75,6 +103,14 @@ class _MyLogPageState extends State<MyLogPage> {
     final List<Bird> filtered = q.isEmpty
         ? const []
         : birds.where((b) => b.name.toLowerCase().contains(q)).toList();
+
+    final Map<String, List<Bird>> grouped = <String, List<Bird>>{};
+    for (final b in filtered) {
+      final key = (b.order ?? '').toString();
+      if (key.isEmpty) continue;
+      (grouped[key] ??= []).add(b);
+    }
+    final List<String> orderNames = grouped.keys.toList();
 
     return Scaffold(
       backgroundColor: sky,
@@ -113,64 +149,66 @@ class _MyLogPageState extends State<MyLogPage> {
           const SizedBox(width: 10),
         ],
       ),
-      body: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(child: _searchSection()),
+      body: Column(
+        children: [
+          _searchSection(),
 
-          if (searching) ...[
-            if (filtered.isEmpty)
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Center(
-                    child: Text('검색 결과가 없어요',
-                        style: TextStyle(fontSize: 16, color: Colors.black54)),
+          Expanded(child: CustomScrollView(
+            slivers: [
+
+              if (searching) ...[
+                if (filtered.isEmpty)
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Center(
+                        child: Text('검색 결과가 없어요',
+                            style: TextStyle(fontSize: 16, color: Colors.black54)),
+                      ),
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.all(12),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                          final orderName = orderNames[index];
+                          final orderBirds = grouped[orderName] ?? const <Bird>[];
+                          return _OrderSection(
+                            title: orderName,
+                            birds: orderBirds,
+                            onTapBird: (b) => _openDetailIfEnabled(b),
+                          );
+                        },
+                        childCount: orderNames.length,
+                      ),
+                    ),
+                  ),
+              ] else ...[
+                // 검색 아닐 때: 목 섹션들
+                SliverPadding(
+                  padding: const EdgeInsets.only(bottom: 24),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                        final order = orders[index];
+                        return _OrderSection(
+                          title: order.name,
+                          birds: order.birds,
+                          onTapBird: (b) => _openDetailIfEnabled(b),
+                        );
+                      },
+                      childCount : orders.length,
+                    ),
                   ),
                 ),
-              )
-            else
-              SliverPadding(
-                padding: const EdgeInsets.all(12),
-                sliver: SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 0.75,
-                  ),
-                  delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                      final bird = filtered[index];
-                      return BirdTile(
-                        bird: bird,
-                        onOpenDetail: () => _openDetailIfEnabled(bird),
-                      );
-                    },
-                    childCount: filtered.length,
-                  ),
-                ),
-              ),
-          ] else ...[
-            // 검색 아닐 때: 목 섹션들
-            SliverPadding(
-              padding: const EdgeInsets.only(bottom: 24),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                    final order = orders[index];
-                    return _OrderSection(
-                      title: order.name,
-                      birds: order.birds,
-                      onTapBird: (b) => _openDetailIfEnabled(b),
-                    );
-                  },
-                  childCount : orders.length,
-                ),
-              ),
-            ),
-          ],
+              ],
+            ],
+          ),
+          ),
         ],
-      ),
+      )
     );
   }
 
@@ -200,7 +238,7 @@ class _MyLogPageState extends State<MyLogPage> {
                 textInputAction: TextInputAction.search,
                 decoration: const InputDecoration(
                   border: InputBorder.none,
-                  hintText: '새명을 입력하세요',
+                  hintText: '종명 혹은 학명을 입력하세요',
                   hintStyle: TextStyle(
                     fontFamily: 'Paperlogy',
                     fontWeight: FontWeight.w400,
@@ -231,6 +269,7 @@ class _MyLogPageState extends State<MyLogPage> {
       ),
     );
   }
+
 
   // 발견된 경우에만 상세 이동
   void _openDetailIfEnabled(Bird bird) {

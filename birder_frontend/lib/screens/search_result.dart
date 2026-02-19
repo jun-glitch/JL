@@ -427,7 +427,7 @@ class _InfoDialog extends StatelessWidget {
                 fontFamily: 'Paperlogy',
                 fontSize: 16,
                 height: 1.3,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w600,
                 color: Colors.black87,
               ),
             ),
@@ -447,7 +447,10 @@ class _InfoDialog extends StatelessWidget {
                 ),
                 child: Text(
                   confirmText,
-                  style: const TextStyle(fontFamily: 'Paperlogy', fontWeight: FontWeight.w800),
+                  style: const TextStyle(
+                      fontFamily: 'Paperlogy',
+                      fontWeight: FontWeight.w600
+                  ),
                 ),
               ),
             ),

@@ -1,3 +1,5 @@
+import 'package:birder_frontend/models/api_client.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_map/flutter_map.dart';
@@ -7,7 +9,14 @@ import 'package:latlong2/latlong.dart';
 
 
 class BirdersLogSpeciesResult extends StatefulWidget {
-  const BirdersLogSpeciesResult({super.key});
+  final String speciesCode;
+  final String speciesName;
+
+  const BirdersLogSpeciesResult({
+    super.key,
+    required this.speciesCode,
+    required this.speciesName,
+  });
 
   @override
   State<BirdersLogSpeciesResult> createState() => _BirdersLogSpeciesResultState();
@@ -23,7 +32,7 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
     super.initState();
 
     final now = DateTime.now();
-    _startDate = DateTime(now.year, now.month, 1);
+    _startDate = DateTime(2020, 1, 1);
     _endDate = DateTime(now.year, now.month + 1, 0); // 이번 달 마지막 날
 
     _outlineFuture = _loadKoreaOutline();
@@ -33,17 +42,7 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
     final y = d.year.toString().padLeft(4, '0');
     final m = d.month.toString().padLeft(2, '0');
     final day = d.day.toString().padLeft(2, '0');
-    return '$y/$m/$day';
-  }
-
-  String _resolveSpeciesName(BuildContext context) {
-
-    // 이전 화면에서 arguments로 넘겨준 값 사용
-    final args = ModalRoute.of(context)?.settings.arguments;
-    if (args is String && args.trim().isNotEmpty) return args.trim();
-
-    // 임시 기본값
-    return '도요새';
+    return '$y-$m-$day';
   }
 
   Future<void> _pickStartDate() async {
@@ -135,17 +134,53 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
   );
 
   Future<List<LatLng>> _fetchObservationPoints({
-    required String speciesName,
     required DateTime? start,
     required DateTime? end,
   }) async {
-    // TODO: 백엔드 API로 교체
+    if (start == null || end == null) return [];
+    try {
+      final dio = ApiClient().dio;
 
-    // 임시 더미
-    return [
-      const LatLng(37.5665, 126.9780), // 서울
-      const LatLng(35.1796, 129.0756), // 부산
-    ];
+      debugPrint('--- API 요청 확인 ---');
+      debugPrint('species_code: "${widget.speciesCode}"'); // 따옴표를 넣어 공백 확인
+      debugPrint('start: ${_fmt(start!)}');
+      debugPrint('end: ${_fmt(end!)}');
+
+      final res = await dio.get(
+        '/api/birds/map/points/',
+        queryParameters: {
+          'species_code': widget.speciesCode,
+          'start': _fmt(start),
+          'end': _fmt(end),
+        },
+      );
+      debugPrint('Raw Server Data: ${res.data}'); // 전체 구조 확인
+
+      final data = res.data;
+      if (data is! Map || data['records'] == null) return [];
+
+      final List<LatLng> resultPoints = [];
+      final speciesList = data['records'] as List;
+
+      for (var species in speciesList) {
+        final observarionLogs = species['records'] as List?;
+        if (observarionLogs != null) {
+          for (var log in observarionLogs) {
+            final lat = (log['latitude'] as num).toDouble();
+            final lng = (log['longitude'] as num).toDouble();
+            resultPoints.add(LatLng(lat, lng));
+          }
+        }
+      }
+
+      return resultPoints;
+    } catch (e) {
+      if (e is DioException && e.response?.statusCode == 404) {
+        debugPrint('해당 기간에 데이터가 없습니다.');
+        return []; // 빈 지도
+    }
+      rethrow; // 에러 메시지 표시
+    }
   }
 
   Future<void> _loadKoreaOutline() async {
@@ -279,7 +314,7 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
               // (종명) 지역별 누적 관측 기록
               Center(
                 child: Text(
-                  '${_resolveSpeciesName(context)} 지역별 누적 관측 기록',
+                  '${widget.speciesName} 지역별 누적 관측 기록',
                   style: TextStyle(
                     fontFamily: 'Paperlogy',
                     fontWeight: FontWeight.w400,
@@ -362,7 +397,6 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
 
                     return FutureBuilder<List<LatLng>>(
                       future: _fetchObservationPoints(
-                        speciesName: _resolveSpeciesName(context),
                         start: _startDate,
                         end: _endDate,
                       ),

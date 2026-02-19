@@ -1,3 +1,4 @@
+import 'package:birder_frontend/models/api_client.dart';
 import 'package:birder_frontend/screens/birders_log_species_result.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -12,7 +13,7 @@ class BirdersLogSpecies extends StatefulWidget {
 class _BirdersLogSpeciesState extends State<BirdersLogSpecies> {
   final TextEditingController _searchCtrl = TextEditingController();
 
-  // 임시 리스트
+  /* 임시 리스트
   final List<String> _allSpecies = const [
     '참새',
     '까치',
@@ -20,6 +21,49 @@ class _BirdersLogSpeciesState extends State<BirdersLogSpecies> {
     '직박구리',
     '까마귀',
   ];
+   */
+
+  List<Map<String, dynamic>> _serverResults = [];
+  bool _loading = false;
+
+  Future<void> _fetchSpeciesFromServer(String query) async {
+    if (query.trim().isEmpty) {
+      setState(() => _serverResults = []);
+      return;
+    }
+
+    setState(() => _loading = true);
+
+    try {
+      final dio = ApiClient().dio;
+
+      final res = await dio.get(
+        '/api/birds/species/',
+        queryParameters: {'kwd': query.trim()},
+      );
+      debugPrint('species search status=${res.statusCode}');
+      debugPrint('species search uri=${res.realUri}');
+      debugPrint('species search data=${res.data}');
+
+      final data = res.data;
+      final records = (data['records'] as List?) ?? [];
+
+      if (!mounted) return;
+
+      setState(() {
+        _serverResults =
+            records.map((e) => Map<String, dynamic>.from(e)).toList();
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _serverResults = [];
+        _loading = false;
+      });
+    }
+  }
+
 
   String _query = '';
 
@@ -33,11 +77,11 @@ class _BirdersLogSpeciesState extends State<BirdersLogSpecies> {
   Widget build(BuildContext context) {
     const sky = Color(0xFFDCEBFF);
 
-    // 검색 결과 필터링
+    /*
     final results = _allSpecies
         .where((s) => s.toLowerCase().contains(_query.trim().toLowerCase()))
         .toList();
-
+     */
 
 
     return Scaffold(
@@ -103,6 +147,7 @@ class _BirdersLogSpeciesState extends State<BirdersLogSpecies> {
                       color: Colors.black,
                     ),
                   ),
+                  /*
                   const Spacer(), // 임시 버튼 (DB + 로그 연결 후 삭제)
                   SizedBox(
                     height: 34,
@@ -128,6 +173,7 @@ class _BirdersLogSpeciesState extends State<BirdersLogSpecies> {
                       ),
                     ),
                   ),
+                  */
 
                 ],
               ),
@@ -149,7 +195,10 @@ class _BirdersLogSpeciesState extends State<BirdersLogSpecies> {
                     Expanded(
                       child: TextField(
                         controller: _searchCtrl,
-                        onChanged: (v) => setState(() => _query = v),
+                        onChanged: (v) {
+                          setState(() => _query = v);
+                          _fetchSpeciesFromServer(v);
+                        },
                         decoration: InputDecoration(
                           border: InputBorder.none,
                           hintText: '새명을 입력하세요',
@@ -173,7 +222,10 @@ class _BirdersLogSpeciesState extends State<BirdersLogSpecies> {
                         icon: const Icon(Icons.close, color: Colors.black45),
                         onPressed: () {
                           _searchCtrl.clear();
-                          setState(() => _query = '');
+                          setState(() {
+                            _query = '';
+                            _serverResults = [];
+                          });
                         },
                       ),
                   ],
@@ -187,7 +239,7 @@ class _BirdersLogSpeciesState extends State<BirdersLogSpecies> {
                 child: Builder(
                   builder: (context) {
                     final hasQuery = _query.trim().isNotEmpty;
-                    final hasResults = results.isNotEmpty;
+                    final hasResults = _serverResults.isNotEmpty;
 
                     // 1) 기본 화면 (계절별 새 목록, 이번주 관측 순위(FE고정))
                     if (!hasQuery) {
@@ -270,6 +322,11 @@ class _BirdersLogSpeciesState extends State<BirdersLogSpecies> {
 
                     }
 
+                    // 2) 검색 결과 있음
+                    if (_loading) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
                     // 3) 검색 결과 없음
                     if (!hasResults) {
                       return Center(
@@ -285,9 +342,41 @@ class _BirdersLogSpeciesState extends State<BirdersLogSpecies> {
                       );
                     }
 
-                    // 2) 검색 결과 있음
-                    // TODO: 검색 결과 UI
-                    return const SizedBox.shrink();
+                    return ListView.separated(
+                      itemCount: _serverResults.length,
+                      separatorBuilder: (_, __) => const Divider(),
+                      itemBuilder: (context, index) {
+                        final item = _serverResults[index];
+
+                        final common = item['common_name'] ?? '';
+                        final scientific = item['scientific_name'] ?? '';
+
+                        return ListTile(
+                          title: Text(
+                            '$common ($scientific)',
+                            style: const TextStyle(
+                              fontFamily: 'Paperlogy',
+                              fontSize: 18,
+                            ),
+                          ),
+                          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                          onTap: () {
+                            final speciesCode = (item['species_code'] ?? '').toString();
+                            final commonName = (item['common_name'] ?? '').toString();
+
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => BirdersLogSpeciesResult(
+                                  speciesCode: speciesCode,
+                                  speciesName: commonName,
+                                ),
+                              ),
+                            );
+                          },
+
+                        );
+                      },
+                    );
 
                   }
                 ),

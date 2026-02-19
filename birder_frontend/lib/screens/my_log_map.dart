@@ -1,10 +1,12 @@
 import 'package:birder_frontend/screens/my_log.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_geojson/flutter_map_geojson.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 
 class MyLogMap extends StatefulWidget {
@@ -100,7 +102,12 @@ class _MyLogMapState extends State<MyLogMap> {
     const LatLng(38.8, 131.1), // 북동
   );
 
-  Future<List<LatLng>> _fetchObservationPoints({
+
+
+
+  final _observationApi = ObservationApi('http://10.0.2.2:8000');
+
+  /*Future<List<LatLng>> _fetchObservationPoints({
     required String speciesName,
     required DateTime? start,
     required DateTime? end,
@@ -113,29 +120,25 @@ class _MyLogMapState extends State<MyLogMap> {
       const LatLng(35.1796, 129.0756), // 부산
     ];
   }
+   */
 
   Future<List<PhotoMarkerData>> _fetchObservationPhotoMarkers({
     required String speciesName,
     required DateTime? start,
     required DateTime? end,
   }) async {
-    // TODO: 도감/백엔드 연결 (사용자가 업로드한 사진 리스트 + 위도/경도 + imageUrl)
+    final dtoList = await _observationApi.fetchMyObservationMarkers(
+      speciesName: speciesName,
+      start: start,
+      end: end,
+      bounds: _southKoreaBounds,
+    );
 
-    // 임시 더미
-    return const [
-      PhotoMarkerData(
-        point: LatLng(37.5665, 126.9780),
-        imageUrl: '',
-      ),
-      PhotoMarkerData(
-        point: LatLng(36.3504, 127.3845),
-        imageUrl: '',
-      ),
-      PhotoMarkerData(
-        point: LatLng(35.1796, 129.0756),
-        imageUrl: '',
-      ),
-    ];
+    return dtoList.map((dto) {
+      return PhotoMarkerData(
+          point: LatLng(dto.lat, dto.lng),
+          imageUrl: dto.imageUrl);
+    }).toList();
   }
 
 
@@ -254,6 +257,90 @@ class _MyLogMapState extends State<MyLogMap> {
 
 
     );
+  }
+
+}
+class ObservationMarkerDto {
+  final double lat;
+  final double lng;
+  final String? imageUrl;
+
+  ObservationMarkerDto({
+    required this.lat,
+    required this.lng,
+    this.imageUrl,
+  });
+
+  factory ObservationMarkerDto.fromJson(Map<String, dynamic> json) {
+    return ObservationMarkerDto(
+      lat: (json['lat'] as num).toDouble(),
+      lng: (json['lng'] as num).toDouble(),
+      imageUrl: (json['image_url'] ?? '').toString(),
+    );
+  }
+}
+class ObservationApi {
+  final Dio dio;
+  ObservationApi(String baseUrl)
+    :dio = Dio(BaseOptions(
+    baseUrl: baseUrl,
+    connectTimeout: const Duration(seconds: 10),
+    receiveTimeout:  const Duration(seconds: 15),
+  ));
+
+  Future<List<ObservationMarkerDto>> fetchMyObservationMarkers({
+    String speciesName = 'ALL',
+    DateTime? start,
+    DateTime? end,
+    required LatLngBounds bounds,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+
+    if (token == null || token.isEmpty) {
+      throw Exception('로그인 토큰이 없습니다. 다시 로그인 해주세요.');
+    }
+
+    try {
+      final resp = await dio.get(
+        '/api/birds/map/v2/points/',
+        queryParameters: {
+          'species': speciesName,
+          'min_lat': bounds.southWest.latitude,
+          'min_lng': bounds.southWest.longitude,
+          'max_lat': bounds.northEast.latitude,
+          'max_lng': bounds.northEast.longitude,
+
+          if (start != null) 'start': start.toIso8601String(),
+          if (end != null) 'end': end.toIso8601String(),
+        },
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      debugPrint('✅ status=${resp.statusCode}');
+      debugPrint('✅ data=${resp.data}');
+
+      final data = resp.data;
+
+      final List list = (data is Map && data['results'] is List)
+          ? data['results']
+          : (data is List ? data : []);
+
+      return list
+          .map((e) => ObservationMarkerDto.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    } on DioException catch (e) {
+      debugPrint('❌ DioException type=${e.type}');
+      debugPrint('❌ message=${e.message}');
+      debugPrint('❌ url=${e.requestOptions.uri}');
+      debugPrint('❌ method=${e.requestOptions.method}');
+      debugPrint('❌ headers=${e.requestOptions.headers}');
+      debugPrint('❌ status=${e.response?.statusCode}');
+      debugPrint('❌ response=${e.response?.data}');
+      rethrow;
+    }
   }
 
 }

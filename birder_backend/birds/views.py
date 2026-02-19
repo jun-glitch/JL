@@ -290,7 +290,7 @@ class UploadBirdPhotoView(APIView):
         # 3) photo 테이블에 인스턴스 추가
         try:
             photo_data = {
-                "s_fileNum" : image_url,
+                "s_filenum" : image_url,
                 "latitude" : lat,
                 "longitude" : lng,
                 "obs_date" : obs_date.isoformat() if obs_date else None
@@ -395,7 +395,7 @@ class SpeciesSummaryView(APIView):
             result = response.data
             observation_count = result.get('observation_count', 0)
 
-            data = result.get('data, []')
+            data = result.get('data', [])
             if not data:
                 return Response({
                     "observation_count" : 0,

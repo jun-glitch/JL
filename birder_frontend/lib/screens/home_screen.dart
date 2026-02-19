@@ -1,10 +1,12 @@
 import 'dart:io';
 
+import 'package:birder_frontend/models/api_client.dart';
 import 'package:birder_frontend/screens/birders_log_main.dart';
 import 'package:birder_frontend/screens/log_in.dart';
 import 'package:birder_frontend/screens/member_info_pages.dart';
 import 'package:birder_frontend/screens/my_log.dart';
 import 'package:birder_frontend/screens/search_result.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -14,6 +16,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'saved_image_page.dart' as pages;
 import 'dart:typed_data';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:geolocator/geolocator.dart';
 
 
 // 임시 이미지 파일
@@ -52,50 +55,158 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final ImagePicker _picker = ImagePicker();
 
-  Future<void> _openCameraAndSave() async {
-  final XFile? photo = await _picker.pickImage(source: ImageSource.camera);
-  if (photo == null) return;
+  // 위치 정보
+  Future<Position?> _getCurrentPosition() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      _showInfoPopup('위치 서비스가 꺼져있어요.');
+      return null;
+    }
 
-  final dir = await getApplicationDocumentsDirectory();
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.denied) {
+      _showInfoPopup('위치 권한이 필요합니다.');
+      return null;
+    }
+    if (permission == LocationPermission.deniedForever) {
+      _showInfoPopup('설정에서 위치 권한을 허용해 주세요.');
+      return null;
+    }
 
-  final ext0 = p.extension(photo.path);
-  final ext = ext0.isNotEmpty ? ext0 : '.jpg';
-
-  final fileName = 'photo_${DateTime.now().millisecondsSinceEpoch}$ext';
-  final savedPath = p.join(dir.path, fileName);
-
-
-  final savedFile = await File(photo.path).copy(savedPath);
-
-  if (!mounted) return;
-
-  Navigator.of(context).push(
-  MaterialPageRoute(
-  builder: (_) => pages.SavedImagePage(imagePath: savedFile.path),
-  ),
-  );
+    return Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
   }
+
+
+  // 카메라 열고 사진 로컬 저장
+  Future<void> _openCameraAndUpload() async {
+    final XFile? photo = await _picker.pickImage(source: ImageSource.camera);
+    if (photo == null) return;
+
+    try {
+      final file = File(photo.path);
+      final pos = await _getCurrentPosition();
+      final result = await _uploadBirdPhoto(
+        file,
+        latitude: pos?.latitude,
+        longitude: pos?.longitude,
+      );
+
+      final photoNum = result['photo_num']?.toString() ?? '';
+      _showInfoPopup(
+        photoNum.isEmpty ? '업로드가 완료되었습니다.' : '업로드가 완료되었습니다.\nphoto_num: $photoNum',
+      );
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      final msg = (data is Map && data['message'] != null)
+          ? data['message'].toString()
+          : (data is Map && data['detail'] != null)
+          ? data['detail'].toString()
+          : '업로드에 실패했습니다.';
+      _showInfoPopup(msg);
+    } catch (e) {
+      _showInfoPopup('업로드에 실패했습니다.\n$e');
+    }
+  }
+
+  // 갤러리에서 저장 + 서버 업로드
   Future<void> _pickFromGalleryAndSave() async {
     final XFile? picked = await _picker.pickImage(source: ImageSource.gallery);
     if (picked == null) return;
 
-    final dir = await getApplicationDocumentsDirectory();
+    try {
+      final file = File(picked.path);
+      final pos = await _getCurrentPosition();
+      final result = await _uploadBirdPhoto(
+        file,
+        latitude: pos?.latitude,
+        longitude: pos?.longitude,
+      );
 
-    final ext0 = p.extension(picked.path);
-    final ext = ext0.isNotEmpty ? ext0 : '.jpg';
+      final imageUrl = result['image_url']?.toString();
+      final photoNum = result['photo_num']?.toString();
 
-    final fileName = 'gallery_${DateTime.now().millisecondsSinceEpoch}$ext';
-    final savedPath = p.join(dir.path, fileName);
+      _showInfoPopup('업로드가 완료되었습니다.\nphoto_num: $photoNum');
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      final msg = (data is Map && data['message'] != null)
+          ? data['message'].toString()
+          : (data is Map && data['detail'] != null)
+            ? data['detail'].toString()
+            : '업로드에 실패했습니다.';
 
-    final savedFile = await File(picked.path).copy(savedPath);
+      _showInfoPopup(msg);
+    } catch (e) {
+      _showInfoPopup('업로드에 실패했습니다.\n$e');
+    }
+  }
+  void _showInfoPopup(String msg) {
+    showDialog(
+      context: context,
+      builder: (_) => _UploadResultDialog(message: msg),
+    );
+  }
 
-    if (!mounted) return;
 
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => pages.SavedImagePage(imagePath: savedFile.path),
+  // 사진 업로드 연결
+  Future<Map<String, dynamic>> _uploadBirdPhoto(
+      File file, {
+        double? latitude,
+        double? longitude,
+  }) async {
+    final dio = ApiClient().dio;
+
+    // 전송 객체
+    final formData = FormData.fromMap({
+      'image': await MultipartFile.fromFile(
+        file.path,
+        filename: p.basename(file.path),
+      ),
+      if (latitude != null) 'latitude': latitude.toString(),
+      if (longitude != null) 'longitude': longitude.toString(),
+    });
+
+
+    final res = await dio.post(
+      '/api/birds/upload/photo',
+      data: formData,
+      options: Options(contentType: 'multipart/form-data'),
+    );
+
+    if (res.data is Map) {
+      return Map<String, dynamic>.from(res.data);
+    }
+    return {'detail': 'unexpected response'};
+  }
+
+  // 로그인 확인
+  Future<bool> _ensureLoggedIn() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+
+    if (isLoggedIn) return true;
+    if (!mounted) return false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => _LoginRequiredDialog(
+          message: '로그인이 필요합니다',
+          onClose: () => Navigator.of(context).pop(),
+          onLogin: () {
+            Navigator.of(context).pop();
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const LoginPage()),
+            );
+          },
       ),
     );
+
+    return false;
   }
 
   @override
@@ -181,7 +292,8 @@ class _HomeScreenState extends State<HomeScreen> {
             size: mid,
             backgroundColor: const Color(0xFFB0CEFF),
             text: 'MY Log',
-            onTap: () {
+            onTap: () async {
+              if (!await _ensureLoggedIn()) return;
               Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const MyLogPage())
               );
@@ -198,7 +310,8 @@ class _HomeScreenState extends State<HomeScreen> {
             text: 'Birder\'s \n Log',
             textHeight: 1.17,
             yOffset: 3.5,
-            onTap: () {
+            onTap: () async {
+              if (!await _ensureLoggedIn()) return;
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const BirdersLogMain())
               );
@@ -257,7 +370,10 @@ class _HomeScreenState extends State<HomeScreen> {
             size: mid,
             backgroundColor: const Color(0xFFB0CEFF),
             text: '촬영',
-            onTap: () => _openCameraAndSave(),
+            onTap: () async {
+              if (!await _ensureLoggedIn()) return;
+              await _openCameraAndUpload();
+            },
           ),
           _buildAnimatedBubbleButton(
             screenSize: screenSize,
@@ -266,7 +382,10 @@ class _HomeScreenState extends State<HomeScreen> {
             size: mid * 0.85,
             backgroundColor: const Color(0xFF98BFFF),
             text: '사진 \n 업로드',
-            onTap: () => _pickFromGalleryAndSave(),
+            onTap: () async {
+              if (!await _ensureLoggedIn()) return;
+              await _pickFromGalleryAndSave();
+            },
           ),
           _buildAnimatedBubbleButton(
             screenSize: screenSize,
@@ -378,6 +497,154 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+class _LoginRequiredDialog extends StatelessWidget {
+  final String message;
+  final VoidCallback onClose;
+  final VoidCallback onLogin;
+
+  const _LoginRequiredDialog({
+    required this.message,
+    required this.onClose,
+    required this.onLogin,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 6),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontFamily: 'Paperlogy',
+                fontSize: 16,
+                height: 1.3,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 44,
+                    child: ElevatedButton(
+                      onPressed: onClose,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD7E8FF),
+                        foregroundColor: Colors.black87,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text(
+                        '닫기',
+                        style: TextStyle(
+                          fontFamily: 'Paperlogy',
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: SizedBox(
+                    height: 44,
+                    child: ElevatedButton(
+                      onPressed: onLogin,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD7E8FF),
+                        foregroundColor: Colors.black87,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text(
+                        '로그인',
+                        style: TextStyle(
+                          fontFamily: 'Paperlogy',
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+class _UploadResultDialog extends StatelessWidget {
+  final String message;
+
+  const _UploadResultDialog({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 6),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontFamily: 'Paperlogy',
+                fontSize: 16,
+                height: 1.3,
+                fontWeight: FontWeight.w800,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 44,
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD7E8FF),
+                  foregroundColor: Colors.black87,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: const Text(
+                  '닫기',
+                  style: TextStyle(
+                    fontFamily: 'Paperlogy',
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

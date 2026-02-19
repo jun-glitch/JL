@@ -168,7 +168,8 @@ class _LoginPageState extends State<LoginPage> {
 
                               final String userEmail = (user['email'] ?? '').toString();
 
-                              final String userName = '';
+                              final String userName = (user['username'] ?? '').toString();
+                              print(userId);print(userEmail);print(userName);
 
                               final prefs = await SharedPreferences.getInstance();
                               await prefs.setBool('isLoggedIn', true);

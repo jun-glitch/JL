@@ -77,7 +77,6 @@ class AuthApi {
       final String refresh = session['refresh_token'];
       setAccessToken(access);
     }
-    throw Exception('로그인 응답 형식이 올바르지 않습니다.');
   }
 
   Future<void> changePassword({

@@ -20,22 +20,38 @@ class Bird {
     required this.imageUrl,
   });
 
-  factory Bird.fromFieldGuideJson(Map<String, dynamic> json) {
-    final last = json['last_observed_at'];
-    DateTime? lastDt;
-    if (last is String && last.isNotEmpty) {
-      // DRF가 ISO로 내려주는 경우 보통 parse 가능
-      lastDt = DateTime.tryParse(last);
-    }
+  static int _toInt(dynamic v) {
+    if (v == null) return 0;
+    if (v is int) return v;
+    if (v is double) return v.toInt();
+    if (v is String) return int.tryParse(v) ?? 0;
+    return 0;
+  }
 
+  static DateTime? _toDate(dynamic v) {
+    if (v is String && v.isNotEmpty) return DateTime.tryParse(v);
+    return null;
+  }
+
+  static bool _toBool(dynamic v) {
+    if (v == true) return true;
+    if (v is String) return v.toLowerCase() == 'true' || v == '1';
+    if (v is num) return v != 0;
+    return false;
+  }
+
+  factory Bird.fromFieldGuideJson(
+      Map<String, dynamic> json, {
+        required String orderName,
+      }) {
     return Bird(
       speciesCode: (json['species_code'] ?? '').toString(),
       name: (json['common_name'] ?? '').toString(),
       scientificName: (json['scientific_name'] ?? '').toString(),
-      order: (json['order'] ?? '').toString(),
-      discovered: json['observed'] == true,
-      observationCount: (json['observation_count'] ?? 0) as int,
-      lastObservedAt: lastDt,
+      order: orderName,
+      discovered: _toBool(json['observed']),
+      observationCount: _toInt(json['observation_count']),
+      lastObservedAt: _toDate(json['last_observed_at']),
       imageUrl: json['cover_image_url']?.toString(),
     );
   }
