@@ -72,6 +72,7 @@ class LoginView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        print('login')
         login_info = request.data
 
         id = login_info.get('username')
@@ -269,10 +270,8 @@ class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        access_token = request.auth
-
         try:
-            supabase.auth.sign_out(access_token)
+            supabase.auth.sign_out()
             return Response({"message" : "로그아웃이 성공적으로 완료되었습니다."}, status=status.HTTP_204_NO_CONTENT)
         except Exception as e:
             return Response({"message" : f"로그아웃 중 에러 발생: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
