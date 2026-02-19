@@ -38,6 +38,11 @@ class FieldGuideView(APIView):
                     ).select('species_code', 'common_name', 'scientific_name', 'order_name', 'family_name'
                     ).or_(f"common_name.ilike.%{kwd}%,scientific_name.ilike.%{kwd}%"
                     ).order('order_name', desc=False).execute()
+            
+            species_list = species_qs.data
+
+            for entry in species_list:
+                entry['observed'] = False
             """
             species_list = list(
                 species_qs.values("species_code", "common_name", "scientific_name", "order")
@@ -123,6 +128,6 @@ class FieldGuideView(APIView):
             out = FieldGuideOrderGroupSerializer(groups_payload, many=True)
             """
 
-            return Response({"list": species_qs.data}, status=status.HTTP_200_OK)
+            return Response({"groups": species_qs.data}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"message" : f"도감 불러오기 중 에러 발생: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
