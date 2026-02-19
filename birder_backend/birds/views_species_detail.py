@@ -7,7 +7,7 @@ from .serializers_fieldguide import (
     SpeciesObservationDetailSerializer,
     SpeciesObservationItemSerializer,
 )
-from ..integrations.supabase_client import supabase
+from integrations.supabase_client import supabase
 
 class SpeciesObservationsView(APIView):
     """
