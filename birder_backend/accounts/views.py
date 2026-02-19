@@ -82,7 +82,7 @@ class LoginView(APIView):
             return Response({"message" : "아이디와 비밀번호를 모두 입력해주세요"}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            birder_user_query = supabase.table('birder').select('id', 'user_id', 'user_pwd', 'user_email', 'enable', 'location_enabled').eq('user_id', id).single().execute()
+            birder_user_query = supabase.table('birder').select('id', 'user_id', 'user_pwd', 'user_email', 'user_name', 'enable', 'location_enabled').eq('user_id', id).single().execute()
             birder_user = birder_user_query.data
 
             if not birder_user:
