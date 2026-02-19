@@ -23,7 +23,7 @@ urlpatterns = [
 
     # 새 사진 업로드 엔드포인트
     # 사진 업로드 + 위경도 정규화 + 로그 생성
-    path("upload/", UploadBirdPhotoView.as_view(), name="birds_upload"),
+    path("upload/photo", UploadBirdPhotoView.as_view(), name="birds_upload"),
     # 지역명으로 종별 누적 관측 횟수
     path("areas/", AreaSummaryView.as_view(), name="area_summary"),
     # 특정 지역 + 종의 관측 로그 목록

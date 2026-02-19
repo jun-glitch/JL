@@ -92,6 +92,7 @@ class LoginView(APIView):
                 return Response({"message" : "비활성화된 계정입니다"}, status=status.HTTP_401_UNAUTHORIZED)
             
             user_email = birder_user.get('user_email')
+            user_name = birder_user.get('user_name')
 
             auth_response = supabase.auth.sign_in_with_password({
                 'email' : user_email,
@@ -108,6 +109,7 @@ class LoginView(APIView):
                 "user" : {
                     "id" : id,
                     "email" : user_email,
+                    "username" : user_name,
                     "location_enable" : birder_user.get('location_enabled')
                 }
             }, status=status.HTTP_200_OK)

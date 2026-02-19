@@ -255,16 +255,12 @@ class IdentifyAnswerView(APIView):
             "is_finished": False,
         })
 
-# 변경된 ERD & supabase 연동 수정 완료
+# 사진 저장 api
 class UploadBirdPhotoView(APIView):
     permission_classes = [IsAuthenticated]
 
-    
     def post(self, request):
-        serializer = UploadBirdPhotoSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-        image = data["image"]
+        image = request.data.get('image')
 
         # 1) 이미지에서 위치정보 추출
         lat, lng, obs_date = extract_exif_data(image)
@@ -279,16 +275,17 @@ class UploadBirdPhotoView(APIView):
             file_content = image.read()
             
             # .upload(경로, 파일데이터, 옵션)
-            storage_response = supabase.storage.from_(settings.SUPABASE_STORAGE_BUCKET).upload(
-                path=file_name,
+            supabase.storage.from_(settings.SUPABASE_STORAGE_BUCKET).upload(
+                path=f"{request.user.id}/{file_name}",
                 file=file_content,
                 file_options={"content-type": image.content_type}
             )
 
             # 업로드된 파일의 Public URL 가져오기
             image_url = supabase.storage.from_(settings.SUPABASE_STORAGE_BUCKET).get_public_url(file_name)
+
         except Exception as e:
-            return Response({"detail" : f"Storage upload failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message" : f"Supabase Storage upload failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         # 3) photo 테이블에 인스턴스 추가
         try:
@@ -301,34 +298,41 @@ class UploadBirdPhotoView(APIView):
         
             db_photo_res = supabase.table("photo").insert(photo_data).execute()
         except Exception as e:
-            return Response({"detail" : f"Supabase Photo table upload failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        # 4) log 테이블에 인스턴스 추가
-        try:
-            if not db_photo_res.data : 
-                return Response({"error" : "Failed to retrieve saved photo data"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            
-            photo_num = db_photo_res.data[0]["photo_num"]
-
-            log_data = {
-                "photo_num" : photo_num,
-                "species_code" : data["species_code"],
-                "reg_date" : datetime.now().isoformat(),
-                "id" : request.user.id
-            }
-
-            db_log_res = supabase.table("log").insert(log_data).execute()
-        except Exception as e:
-            return Response({"detail" : f"Supabase log table upload failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message" : f"Supabase Photo table upload failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         return Response(
             {
-                "log_id": db_log_res.data[0]["log_num"],
-                "photo_id": photo_num,
+                "latitude": lat,
+                "longitude" : lng,
                 "image_url": image_url,
+                "photo_num" : db_photo_res.data[0]['photo_num']
             },
             status=status.HTTP_201_CREATED,
         )
+
+# log 테이블 업로드
+class UploadLogView(APIView):
+        permission_classes = [IsAuthenticated]
+
+        def post(self, request):
+            photo_num = request.data.get('photo_num')
+            species_code = request.data.get('species_code')
+    
+            # 4) log 테이블에 인스턴스 추가
+            try:
+                log_data = {
+                    "photo_num" : photo_num,
+                    "species_code" : species_code,
+                    "reg_date" : datetime.now().isoformat(),
+                    "id" : request.user.id
+                }
+
+                supabase.table("log").insert(log_data).execute()
+            except Exception as e:
+                return Response({"message" : f"Supabase log table upload failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            return Response({"message" : "로그 추가가 완료되었습니다."},status=status.HTTP_201_CREATED)
+
 
 # 지역별 누적 관측 횟수 뷰    
 class AreaSummaryView(APIView):
