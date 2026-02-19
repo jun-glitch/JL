@@ -419,7 +419,7 @@ class SpeciesSummaryView(APIView):
                     "latitude" : entry['latitude'],
                     "location" : entry['location'],
                     "date" : entry['obs_date'],
-                    "img_url" : entry['s_fileNum']
+                    "img_url" : entry['s_filenum']
                 })
             
             return Response({
@@ -434,6 +434,55 @@ class AreaSpeciesLogsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, area: str, species_code: str):
+        try:
+            area2 = request.query_params.get("area2") # 세종특별자치도는 예외
+            limit = int(request.query_params.get("limit", 20))
+            offset = int(request.query_params.get("offset", 0))
+
+            prefix = area.strip()
+            if area2:
+                prefix += f" {area2.strip()}"
+
+            response = (
+                supabase
+                .table("log")
+                .select(
+                    "log_num, reg_date, species_code, photo_num,"
+                    "photo:photo_num(location, latitude, longitude, obs_date, s_filenum)"
+                )
+                .eq("species_code", species_code)
+                .eq("id", str(request.user.id))  
+                .ilike("photo.location", f"{prefix}%")
+                .order("reg_date", desc=True)
+                .range(offset, offset + limit - 1)
+                .execute()
+            )
+
+            rows = response.data or []
+
+            # 프론트 스펙에 맞춰 필드명 변환
+            items = []
+            for r in rows:
+                p = r.get("photo") or {}
+
+                items.append({
+                    "log_id": r.get("log_num"),
+                    "location": p.get("location",""),
+                    "rec_date": r.get("reg_date"),
+                    "obs_date": p.get("obs_date"),
+                    "latitude": p.get("latitude"),
+                    "longitude": p.get("longitude"),
+                    "image_url": p.get("s_filenum"),
+                })
+
+            return Response(items, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(
+                {"message": f"Area species logs failed: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        """
         logs = (
             Log.objects
             .select_related("photo", "species")
@@ -460,7 +509,7 @@ class AreaSpeciesLogsView(APIView):
 
         out = LogItemSerializer(items, many=True)
         return Response(out.data, status=status.HTTP_200_OK)
-
+        """
 # 지도 점(소수점 4자리까지 좌표 라운딩) 
 class SpeciesMapPointsView(APIView):
     permission_classes = [IsAuthenticated]
