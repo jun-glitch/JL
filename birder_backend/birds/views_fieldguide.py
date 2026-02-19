@@ -30,19 +30,6 @@ class FieldGuideView(APIView):
         # observed_param = request.query_params.get("observed")  # "true" | "false" | None
 
         try:
-            # Species 먼저 필터링
-            species_qs = supabase.table('species').select('species_code', 'common_name', 'scientific_name', 'order_name', 'family_name').execute()
-
-            if kwd:
-                species_qs = supabase.table('species'
-                    ).select('species_code', 'common_name', 'scientific_name', 'order_name', 'family_name'
-                    ).or_(f"common_name.ilike.%{kwd}%,scientific_name.ilike.%{kwd}%"
-                    ).order('order_name', desc=False).execute()
-            
-            species_list = species_qs.data
-
-            for entry in species_list:
-                entry['observed'] = False
             """
             species_list = list(
                 species_qs.values("species_code", "common_name", "scientific_name", "order")
@@ -127,7 +114,31 @@ class FieldGuideView(APIView):
             groups_payload.sort(key=lambda g: g["order"])
             out = FieldGuideOrderGroupSerializer(groups_payload, many=True)
             """
+            # Species 먼저 필터링
 
-            return Response({"groups": species_qs.data}, status=status.HTTP_200_OK)
+            if kwd:
+                species_qs = supabase.table('species'
+                    ).select('species_code', 'common_name', 'scientific_name', 'order_name', 'family_name'
+                    ).or_(f"common_name.ilike.%{kwd}%,scientific_name.ilike.%{kwd}%"
+                    ).order('order_name', desc=False).execute()
+                species = species_qs.data
+
+                for entry in species:
+                    entry['observed'] = False
+                
+                species_list['order_list'] = species
+            else:
+                species_list = []
+                order_list = supabase.table('species').select('order_name').execute()
+
+                species_list['order_list'] = order_list
+
+                for entry in order_list:
+                    species_inOrder_list = supabase.table('species').select('species_code', 'common_name', 'scientific_name', 'family_name'
+                        ).eq('order_name', entry).execute()
+                    
+                    species_list[entry] = species_inOrder_list
+
+            return Response({species_list}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"message" : f"도감 불러오기 중 에러 발생: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
