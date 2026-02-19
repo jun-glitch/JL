@@ -115,30 +115,29 @@ class FieldGuideView(APIView):
             out = FieldGuideOrderGroupSerializer(groups_payload, many=True)
             """
             # Species 먼저 필터링
-
+            query = supabase.table('species').select('species_code', 'common_name', 'scientific_name', 'order_name', 'family_name')
             if kwd:
-                species_qs = supabase.table('species'
-                    ).select('species_code', 'common_name', 'scientific_name', 'order_name', 'family_name'
-                    ).or_(f"common_name.ilike.%{kwd}%,scientific_name.ilike.%{kwd}%"
-                    ).order('order_name', desc=False).execute()
-                species = species_qs.data
+                query = query.or_(f'common_name.ilike.%{kwd}%,scientific_name.ilike.%{kwd}%')
+            
+            response = query.order('order_name', desc=False).execute()
+            all_data = response.data
 
-                for entry in species:
-                    entry['observed'] = False
+            grouped_res = {}
+            order_names = []
+
+            for entry in all_data:
+                order = entry['order_name']
+
+                if order not in grouped_res:
+                    grouped_res[order] = []
+                    order_names.append(order)
                 
-                species_list['order_list'] = species
-            else:
-                species_list = []
-                order_list = supabase.table('species').select('order_name').execute()
+                entry['observed'] = False
+                grouped_res[order].append(entry)
 
-                species_list['order_list'] = order_list
-
-                for entry in order_list:
-                    species_inOrder_list = supabase.table('species').select('species_code', 'common_name', 'scientific_name', 'family_name'
-                        ).eq('order_name', entry).execute()
-                    
-                    species_list[entry] = species_inOrder_list
-
-            return Response({species_list}, status=status.HTTP_200_OK)
+            return Response({
+                "order_list" : order_names,
+                "spcies_data" : grouped_res
+            }, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"message" : f"도감 불러오기 중 에러 발생: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
