@@ -364,13 +364,13 @@ class AreaSummaryView(APIView):
                         "species_code" : code,
                         "common_name" : species_info["common_name"],
                         "scientific_name" : species_info["scientific_name"],
-                        "total_count" : 0
+                        "observation_count" : 0
                     }
-                summary_dict[code]["total_count"] += 1
+                summary_dict[code]["observation_count"] += 1
             
             payload = sorted(
                 summary_dict.values(),
-                key=lambda x: x["total_count"],
+                key=lambda x: x["observation_count"],
                 reverse=True
             )
 
@@ -393,12 +393,12 @@ class SpeciesSummaryView(APIView):
             # log_num, species_code, common_name, scientific_name, longitude, latitude, location, obs_date, s_fileNum
             response = supabase.rpc("search_logs_by_species", {"kwd": kwd}).execute()
             result = response.data
-            total_count = result.get('total_count', 0)
+            observation_count = result.get('observation_count', 0)
 
             data = result.get('data, []')
             if not data:
                 return Response({
-                    "total_count" : 0,
+                    "observation_count" : 0,
                     "records" : []
                 }, status=status.HTTP_200_OK) # 검색된 로그가 없는 경우 빈 배열 전송
             
@@ -423,7 +423,7 @@ class SpeciesSummaryView(APIView):
                 })
             
             return Response({
-                "total_count" : total_count,
+                "observation_count" : observation_count,
                 "records" : list(grouped_data.values())
             }, status=status.HTTP_200_OK)
         except Exception as e:
