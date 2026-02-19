@@ -137,7 +137,7 @@ class FieldGuideView(APIView):
 
             return Response({
                 "order_list" : order_names,
-                "spcies_data" : grouped_res
+                "species_data" : grouped_res
             }, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"message" : f"도감 불러오기 중 에러 발생: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
