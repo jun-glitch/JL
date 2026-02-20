@@ -5,6 +5,7 @@ from .views import (
     IdentifyAnswerView,
     UploadBirdPhotoView,
     AreaSummaryView,
+    SpeciesSearchView,
     SpeciesSummaryView,
     AreaSpeciesLogsView,
     SpeciesMapPointsView,
@@ -30,7 +31,8 @@ urlpatterns = [
     path("areas/<str:area>/species/<str:species_code>/logs/", AreaSpeciesLogsView.as_view(), name="area_species_logs"),
 
     # 종명으로 지역별 누적 관측 횟수
-    path("species/", SpeciesSummaryView.as_view(), name="species_summary"),
+    path("species/search/", SpeciesSearchView.as_view(), name="species_search"), # 사용자가 검색한 검색어에 해당하고 로그가 존재하는 종 리스트 반환
+    path("species/map/", SpeciesSummaryView.as_view(), name="species_summary"), # 사용자가 종 리스트에서 선택한 특정 종의 관측 로그 반환
 
     # 종명으로 지역별 누적 관측 횟수
     path("species/<str:species>/", SpeciesSummaryView.as_view(), name="species_summary"),

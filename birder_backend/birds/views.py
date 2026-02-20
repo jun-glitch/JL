@@ -378,13 +378,31 @@ class AreaSummaryView(APIView):
         except Exception as e:
             return Response({"message" : f"Area search failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-# 종별 누적 관측 횟수 뷰
+# 종 관측 검색 시 일치하는 종 반환 뷰
+class SpeciesSearchView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            # 프론트에서 보내는 검색 파라미터 읽기
+            kwd = request.query_params.get("kwd")
+
+            if not kwd:
+                return Response({"message" : "검색할 종을 입력해주세요"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            response = supabase.table('species').select('species_code', 'common_name', 'scientific_name', 'log!inner(species_code)').or_(f'common_name.ilike.%{kwd}%,scientific_name.ilike.%{kwd}%').execute()
+
+            return Response({"list" : response.data}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"message" : f"{kwd} 에 해당하는 종 검색 중 에러 발생: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+
+# 특정 종 누적 관측 지도 뷰
 class SpeciesSummaryView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         try:
-            # kwd = request.data.get('species_code')
             kwd = request.query_params.get('kwd')
 
             if not kwd:
