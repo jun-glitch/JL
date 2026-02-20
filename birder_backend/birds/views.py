@@ -15,7 +15,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework.parsers import MultiPartParser, FormParser
 from .models import BirdIdentifySession, BirdCandidate, Photo, Species, Log
 from .serializers import BirdCandidateSerializer, BirdIdentifySessionSerializer, UploadBirdPhotoSerializer, SpeciesSummarySerializer, LogItemSerializer, ObservationUploadSerializer 
-from .services.identify import identify_bird 
+from .services.identify import identify_bird
 from .utils.geocode import normalize_area_from_latlon
 from .utils.supabase_storage import get_public_url
 
@@ -299,16 +299,8 @@ class UploadBirdPhotoView(APIView):
             db_photo_res = supabase.table("photo").insert(photo_data).execute()
         except Exception as e:
             return Response({"message" : f"Supabase Photo table upload failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
-        return Response(
-            {
-                "latitude": lat,
-                "longitude" : lng,
-                "image_url": image_url,
-                "photo_num" : db_photo_res.data[0]['photo_num']
-            },
-            status=status.HTTP_201_CREATED,
-        )
+        image.seek(0)
+        return identify_bird(image)
 
 # log 테이블 업로드
 class UploadLogView(APIView):
