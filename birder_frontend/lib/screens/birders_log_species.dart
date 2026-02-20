@@ -38,7 +38,7 @@ class _BirdersLogSpeciesState extends State<BirdersLogSpecies> {
       final dio = ApiClient().dio;
 
       final res = await dio.get(
-        '/api/birds/species/',
+        '/api/birds/species/search/',
         queryParameters: {'kwd': query.trim()},
       );
       debugPrint('species search status=${res.statusCode}');
@@ -46,7 +46,7 @@ class _BirdersLogSpeciesState extends State<BirdersLogSpecies> {
       debugPrint('species search data=${res.data}');
 
       final data = res.data;
-      final records = (data['records'] as List?) ?? [];
+      final records = (data['list'] as List?) ?? [];
 
       if (!mounted) return;
 

@@ -27,11 +27,11 @@ from PIL.ExifTags import TAGS, GPSTAGS
 class TempTestView(APIView):
     permission_classes = [AllowAny]
 
-    def get(self, request):
+    def post(self, request):
         try:
-            image = request.get('image')
+            image = request.data.get('image')
             out = identify_bird(image)
-            print(out)
+            print(f'out: {out}')
             return Response({"list" : out}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"message" : f"failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

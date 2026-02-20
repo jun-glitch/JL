@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:birder_frontend/screens/my_log.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 /// TODO: DB/서버에서 내려줄 후보 새 데이터 모델로 교체
@@ -20,8 +21,9 @@ class BirdCandidate {
 class IdentifyOverlayPage extends StatefulWidget {
   /// 카메라/갤러리에서 선택한 사진 1~2장
   final List<File> photos;
+  final List<Map<String, dynamic>>? initialCandidates;
 
-  const IdentifyOverlayPage({super.key, required this.photos});
+  const IdentifyOverlayPage({super.key, required this.photos, this.initialCandidates});
 
   @override
   State<IdentifyOverlayPage> createState() => _IdentifyOverlayPageState();
@@ -36,32 +38,107 @@ class _IdentifyOverlayPageState extends State<IdentifyOverlayPage> {
   final PageController _candPc = PageController(viewportFraction: 1.0);
   int _candIndex = 0;
 
-  late final List<BirdCandidate> _candidates;
+  List<BirdCandidate> _candidates = [];
+  bool _loading = true;
+  String? _errorText;
+
+  late final Dio _dio = Dio(
+    BaseOptions(
+      baseUrl: 'http://10.0.2.2:8000',
+      connectTimeout: const Duration(seconds: 80),
+      receiveTimeout: const Duration(seconds: 80),
+    ),
+  );
 
   @override
   void initState() {
     super.initState();
 
-    // TODO: (1) 사진 업로드/추론 요청 -> (2) 후보 리스트를 서버/DB에서 받아오기
-    // 지금은 더미 데이터
-    _candidates = [
-      BirdCandidate(
-        nameKo: "세가락도요",
-        nameSci: "Calidris alba",
-        description:
-        "물가의 18~20cm 정도의 작은 도요새이다.\n머리칼은 적갈색이고, 겨울철은 밝은회색이며\n어깨 부분에 조금만 검은 반점이 있다.",
-        imageUrl:
-        "https://images.unsplash.com/photo-1526336024174-e58f5cdd8e13?auto=format&fit=crop&w=600&q=80",
-      ),
-      BirdCandidate(
-        nameKo: "청다리도요사촌",
-        nameSci: "Tringa guttifer",
-        description:
-        "물가의 30cm 정도의 중형 도요새이다.\n굵은 부리로 지면의 작은생물들을 노리며\n위로 살짝 굽은 부리를 가지고 있다.",
-        imageUrl:
-        "https://images.unsplash.com/photo-1501706362039-c6e13d85b07f?auto=format&fit=crop&w=600&q=80",
-      ),
-    ];
+    final init = widget.initialCandidates;
+    if (init != null && init.isNotEmpty) {
+      setState(() {
+        _loading = false;
+        _errorText = null;
+        _candIndex = 0;
+        _candidates = init.map((c) => BirdCandidate(
+          nameKo: (c['common_name_ko'] ?? '').toString(),
+          nameSci: (c['scientific_name'] ?? '').toString(),
+          description: (c['short_description'] ?? '').toString(),
+          imageUrl: '',
+        )).toList();
+      });
+    } else {
+      _requestIdentify(); // 기존 로직
+    }
+
+  }
+
+  Future<void> _requestIdentify() async {
+    try {
+      setState(() {
+        _loading = true;
+        _errorText = null;
+        _candidates = [];
+        _candIndex = 0;
+      });
+
+      final file = widget.photos.first;
+
+      final formData = FormData.fromMap({
+        'image': await MultipartFile.fromFile(
+          file.path,
+          filename: file.path
+              .split('/')
+              .last,
+        ),
+      });
+
+      final res = await _dio.post(
+        '/api/birds/identify/',
+        data: formData,
+        options: Options(contentType: 'multipart/form-data'),
+      );
+
+      final data = (res.data is Map) ? Map<String, dynamic>.from(res.data) : <
+          String,
+          dynamic>{};
+      final list = (data['candidates'] as List?) ?? [];
+
+
+      final candidates = list
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .map((c) =>
+          BirdCandidate(
+            nameKo: (c['common_name_ko'] ?? '').toString(),
+            nameSci: (c['scientific_name'] ?? '').toString(),
+            description: (c['short_description'] ?? '').toString(),
+            imageUrl: '', // 후보 이미지 url
+          ))
+          .toList();
+
+      if (!mounted) return;
+      setState(() {
+        _candidates = candidates;
+        _loading = false;
+      });
+    } on DioException catch (e) {
+      debugPrint('identify 실패: ${e.response?.statusCode} ${e.response?.data}');
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _errorText = '새 식별에 실패했어요. 빈 후보로 표시합니다.';
+        _candidates = [];
+      });
+    } catch (e) {
+      debugPrint('identify 예외: $e');
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _errorText = '새 식별 중 오류가 발생했어요.';
+        _candidates = [];
+      });
+    }
   }
 
   @override
@@ -74,25 +151,38 @@ class _IdentifyOverlayPageState extends State<IdentifyOverlayPage> {
   Future<void> _onYes() async {
     final picked = _candidates[_candIndex];
 
-    // TODO: "도감에 추가" 서버/DB 저장 호출
-    // await MyApi.addToCollection(birdId: picked.id, photo: ...);
+    try {
+      await _dio.post(
+        '/api/birds/confirm',
+        data: {
+          'scientific_name': picked.nameSci
+        },
+      );
 
     if (!mounted) return;
     await showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => _InfoDialog(
-        message: "도감에 추가되었습니다",
-        confirmText: "확인",
-        onConfirm: () {
-          Navigator.of(context).pop(); // 다이얼로그 닫기
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const MyLogPage()), // 도감 화면
-                (route) => false,
-          );
-        },
-      ),
+      builder: (_) =>
+          _InfoDialog(
+            message: "도감에 추가되었습니다",
+            confirmText: "확인",
+            onConfirm: () {
+              Navigator.of(context).pop(); // 다이얼로그 닫기
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const MyLogPage()), // 도감 화면
+                    (route) => false,
+              );
+            },
+          ),
     );
+    } on DioException catch (e) {
+      debugPrint('confirm 실패: ${e.response?.statusCode} ${e.response?.data}');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('도감 추가에 실패했어요.')),
+      );
+    }
   }
 
   Future<void> _onNo() async {
@@ -165,13 +255,31 @@ class _IdentifyOverlayPageState extends State<IdentifyOverlayPage> {
                     padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
                     child: SizedBox(
                       height: MediaQuery.of(context).size.height * 0.65,
-                      child: _BottomCandidateCard(
+                      child: _loading
+                          ? const Center(
+                        child: CircularProgressIndicator(),
+                      )
+                          : (_candidates.isEmpty
+                          ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Text(
+                            _errorText ?? '후보를 불러오지 못했어요.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontFamily: 'Paperlogy',
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      )
+                          : _BottomCandidateCard(
                         candidates: _candidates,
                         pageController: _candPc,
                         onChanged: (i) => setState(() => _candIndex = i),
                         onYes: _onYes,
                         onNo: _onNo,
-                      ),
+                      )),
                     ),
                   ),
                 ),
@@ -237,13 +345,20 @@ class _BottomCandidateCard extends StatelessWidget {
                             borderRadius: BorderRadius.circular(14),
                             child: AspectRatio(
                               aspectRatio: 1,
-                              child: Image.network(
+                              child: (c.imageUrl.isNotEmpty)
+                                  ? Image.network(
                                 c.imageUrl,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Container(
-                                  color: Colors.white,
-                                  child: const Center(
-                                    child: Icon(Icons.image_not_supported),
+                                errorBuilder: (_, __, ___) =>
+                                const Center(child: Icon(Icons.image_not_supported)),
+                              )
+                                  : Container(
+                                color: Colors.white,
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.image_not_supported,
+                                    size: 40,
+                                    color: Colors.grey,
                                   ),
                                 ),
                               ),

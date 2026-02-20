@@ -147,7 +147,7 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
       debugPrint('end: ${_fmt(end!)}');
 
       final res = await dio.get(
-        '/api/birds/map/points/',
+        '/api/birds/species/map/',
         queryParameters: {
           'species_code': widget.speciesCode,
           'start': _fmt(start),

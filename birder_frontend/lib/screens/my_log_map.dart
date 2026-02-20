@@ -241,14 +241,44 @@ class _MyLogMapState extends State<MyLogMap> {
                 end: null,
               ),
               builder: (context, snap) {
-                if (snap.hasError) {
-                  return Center(child: Text('포인트 로드 에러: ${snap.error}'));
-                }
-                if (!snap.hasData) {
+                if (snap.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                return _buildKoreaMap(snap.data!);
+
+                final hasError = snap.hasError;
+                final markers = (!hasError && snap.hasData)
+                    ? snap.data!
+                    : const <PhotoMarkerData>[];
+
+                if (hasError) {
+                  debugPrint('포인트 로드 에러: ${snap.error}');
+                }
+
+                return Stack(
+                  children: [
+                    _buildKoreaMap(markers), // 에러여도 빈 지도
+
+                    if (hasError)
+                      Positioned(
+                        left: 16,
+                        right: 16,
+                        top: 16,
+                        child: Material(
+                          elevation: 2,
+                          borderRadius: BorderRadius.circular(12),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Text(
+                              '포인트를 불러오지 못했어요. (빈 지도를 표시합니다)',
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                );
               },
+
             );
 
           },

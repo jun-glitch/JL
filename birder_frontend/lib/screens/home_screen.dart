@@ -97,8 +97,23 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       final photoNum = result['photo_num']?.toString() ?? '';
+      final candidates = (result['candidates'] as List? ?? [])
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+
       _showInfoPopup(
         photoNum.isEmpty ? '업로드가 완료되었습니다.' : '업로드가 완료되었습니다.\nphoto_num: $photoNum',
+        onConfirm: () {
+          if (!mounted) return;
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => IdentifyOverlayPage(
+                  photos: [file],
+                  initialCandidates: candidates,),
+            ),
+          );
+        },
       );
     } on DioException catch (e) {
       final data = e.response?.data;
@@ -127,10 +142,26 @@ class _HomeScreenState extends State<HomeScreen> {
         longitude: pos?.longitude,
       );
 
-      final imageUrl = result['image_url']?.toString();
-      final photoNum = result['photo_num']?.toString();
 
-      _showInfoPopup('업로드가 완료되었습니다.\nphoto_num: $photoNum');
+      final photoNum = result['photo_num']?.toString();
+      final candidates = (result['candidates'] as List? ?? [])
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+
+      _showInfoPopup('업로드가 완료되었습니다.\nphoto_num: $photoNum',
+        onConfirm: () {
+          if (!mounted) return;
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => IdentifyOverlayPage(
+                  photos: [file],
+                  initialCandidates: candidates,
+              ),
+            ),
+          );
+        },
+      );
     } on DioException catch (e) {
       final data = e.response?.data;
       final msg = (data is Map && data['message'] != null)
@@ -144,10 +175,16 @@ class _HomeScreenState extends State<HomeScreen> {
       _showInfoPopup('업로드에 실패했습니다.\n$e');
     }
   }
-  void _showInfoPopup(String msg) {
+  void _showInfoPopup(String msg, {VoidCallback? onConfirm}) {
     showDialog(
       context: context,
-      builder: (_) => _UploadResultDialog(message: msg),
+      barrierDismissible: false,
+      builder: (dialogContext) => _UploadResultDialog(
+          message: msg,
+          onConfirm: () {
+            Navigator.of(dialogContext).pop();
+            onConfirm?.call();
+          }),
     );
   }
 
@@ -172,7 +209,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
 
     final res = await dio.post(
-      '/api/birds/upload/photo',
+      '/api/birds/test/',
       data: formData,
       options: Options(contentType: 'multipart/form-data'),
     );
@@ -596,8 +633,12 @@ class _LoginRequiredDialog extends StatelessWidget {
 }
 class _UploadResultDialog extends StatelessWidget {
   final String message;
+  final VoidCallback? onConfirm;
 
-  const _UploadResultDialog({required this.message});
+  const _UploadResultDialog({
+    required this.message,
+    this.onConfirm,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -636,7 +677,7 @@ class _UploadResultDialog extends StatelessWidget {
                   ),
                 ),
                 child: const Text(
-                  '닫기',
+                  '확인',
                   style: TextStyle(
                     fontFamily: 'Paperlogy',
                     fontWeight: FontWeight.w800,

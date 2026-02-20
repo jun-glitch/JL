@@ -299,8 +299,12 @@ class UploadBirdPhotoView(APIView):
             db_photo_res = supabase.table("photo").insert(photo_data).execute()
         except Exception as e:
             return Response({"message" : f"Supabase Photo table upload failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        image.seek(0)
-        return identify_bird(image)
+        #image.seek(0)
+        #res_list = identify_bird(image)
+
+        #print(res_list)
+
+        return Response({"candidates" : []}, status=status.HTTP_200_OK)
 
 # log 테이블 업로드
 class UploadLogView(APIView):

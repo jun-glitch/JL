@@ -12,6 +12,7 @@ def encode_image_to_base64(image_file) -> str:
 # 정규화
 def normalize_candidates(candidates: Any) -> List[Dict[str, Any]]:
     if not isinstance(candidates, list):
+        print('candidate not list')
         return []
 
     cleaned = []
@@ -35,11 +36,17 @@ def normalize_candidates(candidates: Any) -> List[Dict[str, Any]]:
 
 
 def identify_bird(image_file) -> List[Dict[str, Any]]:
+    print('identify bird 진입')
     try:
         base64_image = encode_image_to_base64(image_file)
+        if not base64_image:
+            print('identify bird base 64 image None')
+            return []
         mime_type = getattr(image_file, "content_type", None) or "image/jpeg"
-        candidates = identify_with_gpt(base64_image)
+        candidates = identify_with_gpt(base64_image) ##
+        print(candidates)
         return normalize_candidates(candidates)
 
-    except Exception:
+    except Exception as e:
+        print(f'{str(e)}')
         return []

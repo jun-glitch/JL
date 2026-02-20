@@ -55,7 +55,7 @@ class BirdTile extends StatelessWidget {
                     else
                     // 이미지 없으면 빈 아이콘
                       const Center(
-                        child: Icon(Icons.image_not_supported, size: 28),
+                        child: Icon(Icons.question_mark, size: 28),
                       ),
 
                     // 발견한 새 체크
