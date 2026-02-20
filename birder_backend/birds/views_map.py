@@ -8,9 +8,9 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+from .serializers_map import MapPointSerializer
 
-from .models import Log, Species
-from .serializers_map import MapPointSerializer, MapClusterSerializer
+from integrations.supabase_client import supabase
 
 
 def _parse_bbox(request) -> Tuple[float, float, float, float]:
@@ -39,9 +39,6 @@ def _parse_bbox(request) -> Tuple[float, float, float, float]:
 
 
 def _parse_limit(request, default=500, max_limit=2000) -> int:
-    """
-    points API의 최대 응답 개수를 제한
-    """
     raw = request.query_params.get("limit", str(default))
     try:
         n = int(raw)
@@ -51,14 +48,6 @@ def _parse_limit(request, default=500, max_limit=2000) -> int:
 
 
 def _decimal_places_for_zoom(zoom: int) -> int:
-    """
-    zoom 레벨에 따라 '그리드 집계의 라운딩 자릿수'를 결정.
-    - zoom 낮음: 크게 묶기
-    - zoom 높음: 촘촘히
-
-    지도 확대해보면서 보이는 개수 조절 필요할듯
-
-    """
     if zoom <= 6:
         return 1
     if zoom <= 8:
@@ -68,10 +57,10 @@ def _decimal_places_for_zoom(zoom: int) -> int:
     return 4
 
 # 사진 이미지 정보 URL 반환
-def _photo_image_url(request, photo) -> Optional[str]:
-    if not photo:
+def _photo_image_url_from_row(photo_row: dict) -> Optional[str]:
+    if not photo_row:
         return None
-    return photo.image_url
+    return photo_row.get("s_filenum")
 
 class MapPointsView(APIView):
     permission_classes = [IsAuthenticated]
@@ -84,39 +73,51 @@ class MapPointsView(APIView):
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 본인 관측만
-        qs = (
-            Log.objects
-            .filter(user=request.user)
-            .select_related("photo", "species")
-            .exclude(photo__latitude__isnull=True)
-            .exclude(photo__longitude__isnull=True)
-            .filter(photo__latitude__gte=min_lat, photo__latitude__lte=max_lat)
-            .filter(photo__longitude__gte=min_lng, photo__longitude__lte=max_lng)
+        user_uuid = str(request.user.id)
+
+        resp = (
+            supabase.table("log")
+            .select("""
+                    photo_num,
+                    photo:photo_num (
+                    longitude,
+                    latitude,
+                    s_filenum
+                    )
+            """)
+            .eq("id", user_uuid)
+            .not_("photo.longitude", "is", None)
+            .not_("photo.latitude", "is", None)
+            .gte("photo.latitude", min_lat)
+            .lte("photo.latitude", max_lat) 
+            .gte("photo.longitude", min_lng)
+            .lte("photo.longitude", max_lng)
+            .order("reg_date", desc=True)
+            .execute()
         )
-
-        # 최신 관측 우선
-        qs = qs.order_by("-photo__obs_date", "-reg_date", "-num")[:limit]
-
+        
+        rows = resp.data or []
+        
         points = []
-        for log in qs:
-            photo = log.photo
-            sp = log.species
+        for row in rows:
+            photo = row.get("photo")
+            if not photo:
+                continue
 
             points.append({
-                "photo_id": photo.photo_num,
-                "lat": float(photo.latitude),
-                "lng": float(photo.longitude),
-                "image_url": _photo_image_url(request, photo),
+                "photo_id": row.get("photo_num"),
+                "lat": float(photo["latitude"]),
+                "lng": float(photo["longitude"]),
+                "image_url": photo.get("s_filenum"),
             })
 
         out = MapPointSerializer(points, many=True)
         return Response({
             "bbox": {"min_lat": min_lat, "min_lng": min_lng, "max_lat": max_lat, "max_lng": max_lng},
             "count": len(points),
-            "points": out.data,
+            "results": out.data,
         }, status=status.HTTP_200_OK)
-
+"""
 class MapClustersView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -200,3 +201,4 @@ class MapClustersView(APIView):
             "count": len(clusters),
             "clusters": out.data,
         }, status=status.HTTP_200_OK)
+"""
