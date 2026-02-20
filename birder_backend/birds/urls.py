@@ -16,6 +16,8 @@ from .views_fieldguide import FieldGuideView
 from .views_species_detail import SpeciesObservationsView
 from .views_map import MapPointsView
 
+from .temp_testview import TempTestView
+
 urlpatterns = [
     # 새 식별 관련 엔드포인트
     path("identify/", IdentifyView.as_view(), name="bird_identify"),
@@ -51,4 +53,8 @@ urlpatterns = [
     path("species/<str:species_code>/observations/", SpeciesObservationsView.as_view(), name="species_observations"),
     
     # 피크민st 지도 API v2
-    path("map/v2/points/", MapPointsView.as_view(), name="map_points_v2"),]
+    path("map/v2/points/", MapPointsView.as_view(), name="map_points_v2"),
+
+    # test View
+    path("test/", TempTestView.as_view(), name="temptest")
+]
