@@ -10,8 +10,9 @@ from rest_framework.response import Response
 from rest_framework import status
 from .serializers_map import MapPointSerializer
 
-from integrations.supabase_client import supabase
+from integrations.supabase_client import get_supabase_client
 
+import traceback
 
 def _parse_bbox(request) -> Tuple[float, float, float, float]:
     """
@@ -73,132 +74,49 @@ class MapPointsView(APIView):
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        user_uuid = str(request.user.id)
-
-        resp = (
-            supabase.table("log")
-            .select("""
-                    photo_num,
-                    photo:photo_num (
-                    longitude,
-                    latitude,
-                    s_filenum
-                    )
-            """)
-            .eq("id", user_uuid)
-            .not_("photo.longitude", "is", None)
-            .not_("photo.latitude", "is", None)
-            .gte("photo.latitude", min_lat)
-            .lte("photo.latitude", max_lat) 
-            .gte("photo.longitude", min_lng)
-            .lte("photo.longitude", max_lng)
-            .order("reg_date", desc=True)
-            .execute()
-        )
-        
-        rows = resp.data or []
-        
-        points = []
-        for row in rows:
-            photo = row.get("photo")
-            if not photo:
-                continue
-
-            points.append({
-                "photo_id": row.get("photo_num"),
-                "lat": float(photo["latitude"]),
-                "lng": float(photo["longitude"]),
-                "image_url": photo.get("s_filenum"),
-            })
-
-        out = MapPointSerializer(points, many=True)
-        return Response({
-            "bbox": {"min_lat": min_lat, "min_lng": min_lng, "max_lat": max_lat, "max_lng": max_lng},
-            "count": len(points),
-            "results": out.data,
-        }, status=status.HTTP_200_OK)
-"""
-class MapClustersView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
+        user_uuid = request.user.id
         try:
-            min_lat, min_lng, max_lat, max_lng = _parse_bbox(request)
-        except ValueError as e:
-            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            client = get_supabase_client()
+            print("CLIENT TYPE:", type(client), flush=True)
+            print("client.table:", getattr(client, "table", None), flush=True)
+            print("type(client.table):", type(getattr(client, "table", None)), flush=True)
+            print("callable(client.table):", callable(getattr(client, "table", None)), flush=True)
+            query = client.table("log")  
 
-        # zoom 파싱
-        raw_zoom = request.query_params.get("zoom")
-        if raw_zoom is None:
-            return Response({"detail": "zoom is required"}, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            zoom = int(raw_zoom)
-        except ValueError:
-            return Response({"detail": "zoom must be integer"}, status=status.HTTP_400_BAD_REQUEST)
+            query = query.select("photo_num,photo:photo_num(longitude,latitude,s_filenum)")
+            query = query.eq("id", user_uuid)
+            query = query.is_("photo.longitude", "not_null")
+            query = query.is_("photo.latitude", "not_null")
+            query = query.gte("photo.latitude", min_lat).lte("photo.latitude", max_lat)
+            query = query.gte("photo.longitude", min_lng).lte("photo.longitude", max_lng)
+            query = query.order("reg_date", desc=True)
+            query = query.limit(limit)
 
-        dp = _decimal_places_for_zoom(zoom)
+            resp = query.execute()
+            rows = resp.data or []
+            
+            points = []
+            for row in rows:
+                photo = row.get("photo")
+                if not photo:
+                    continue
 
-        # 대표 이미지 포함 여부
-        include_sample = request.query_params.get("include_sample", "true").lower() == "true"
-
-        base = (
-            Log.objects
-            .filter(user=request.user)
-            .exclude(photo__latitude__isnull=True)
-            .exclude(photo__longitude__isnull=True)
-            .filter(photo__latitude__gte=min_lat, photo__latitude__lte=max_lat)
-            .filter(photo__longitude__gte=min_lng, photo__longitude__lte=max_lng)
-        )
-
-        # 클러스터링 
-        agg = (
-            base
-            .annotate(grid_lat=Round("photo__latitude", dp), grid_lng=Round("photo__longitude", dp))
-            .values("grid_lat", "grid_lng")
-            .annotate(count=Count("pk"))
-            .order_by("-count")
-        )
-
-        clusters = []
-
-        # 대표 이미지  가장 최근 사진 1장으로 보여줌 -> 느리면 바꾸기 
-        if not include_sample:
-            for row in agg:
-                clusters.append({
-                    "grid_lat": float(row["grid_lat"]),
-                    "grid_lng": float(row["grid_lng"]),
-                    "count": row["count"],
-                    "sample_image_url": None,
-                })
-        else:
-            for row in agg:
-                glat = float(row["grid_lat"])
-                glng = float(row["grid_lng"])
-
-                sample_log = (
-                    base
-                    .annotate(grid_lat=Round("photo__latitude", dp), grid_lng=Round("photo__longitude", dp))
-                    .filter(grid_lat=glat, grid_lng=glng)
-                    .select_related("photo")
-                    .order_by("-photo__obs_date", "-reg_date", "-num")
-                    .first()
-                )
-
-                sample_url = _photo_image_url(request, sample_log.photo) if sample_log else None
-
-                clusters.append({
-                    "grid_lat": glat,
-                    "grid_lng": glng,
-                    "count": row["count"],
-                    "sample_image_url": sample_url,
+                points.append({
+                    "photo_id": row.get("photo_num"),
+                    "lat": float(photo["latitude"]),
+                    "lng": float(photo["longitude"]),
+                    "image_url": photo.get("s_filenum"),
                 })
 
-        out = MapClusterSerializer(clusters, many=True)
-        return Response({
-            "bbox": {"min_lat": min_lat, "min_lng": min_lng, "max_lat": max_lat, "max_lng": max_lng},
-            "zoom": zoom,
-            "decimal_places": dp,
-            "count": len(clusters),
-            "clusters": out.data,
-        }, status=status.HTTP_200_OK)
-"""
+            out = MapPointSerializer(points, many=True)
+            return Response({
+                "bbox": {"min_lat": min_lat, "min_lng": min_lng, "max_lat": max_lat, "max_lng": max_lng},
+                "count": len(points),
+                "results": out.data,
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            traceback.print_exc() 
+            return Response(
+                {"detail": f"Error fetching map points: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )   
