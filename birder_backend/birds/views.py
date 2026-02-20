@@ -406,46 +406,30 @@ class SpeciesSummaryView(APIView):
             kwd = request.query_params.get('kwd')
 
             if not kwd:
-                return Response({"message" : "검색할 종을 입력해주세요"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"message" : "관측 로그를 검색할 새 종을 입력해주세요."}, status=status.HTTP_400_BAD_REQUEST)
+
+            species_res = supabase.table('species').select('species_code', 'common_name', 'scientific_name').eq('species_code', kwd).single().execute()
+            species_info = species_res.data # {'common_name' : '', 'scientific_name' : ''}
 
             # log_num, species_code, common_name, scientific_name, longitude, latitude, location, obs_date, s_fileNum
-            response = supabase.rpc("search_logs_by_species", {"kwd": kwd}).execute()
-            result = response.data
-            observation_count = result.get('observation_count', 0)
+            log_res = supabase.rpc("get_logs_by_species_code", {"p_species_code": kwd}).execute()
+            result = log_res.data
 
-            data = result.get('data', [])
-            if not data:
+            observation_count = result.get('observation_count', 0)
+            records = result.get('logs', [])
+
+            if not records:
                 return Response({
                     "observation_count" : 0,
                     "records" : []
                 }, status=status.HTTP_200_OK) # 검색된 로그가 없는 경우 빈 배열 전송
             
-            grouped_data = {}
-            for entry in data:
-                code = entry['species_code']
-                if code not in grouped_data:
-                    grouped_data[code] = {
-                        "species_code" : code,
-                        "common_name" : entry['common_name'],
-                        "scientific_name" : entry['scientific_name'],
-                        "records" : []
-                    }
-                
-                grouped_data[code]['records'].append({
-                    "log_num" : entry['log_num'],
-                    "longitude" : entry['longitude'],
-                    "latitude" : entry['latitude'],
-                    "location" : entry['location'],
-                    "date" : entry['obs_date'],
-                    "img_url" : entry['s_filenum']
-                })
-            
-            return Response({
-                "observation_count" : observation_count,
-                "records" : list(grouped_data.values())
-            }, status=status.HTTP_200_OK)
+            species_info['observation_count'] = observation_count
+            species_info['records'] = records
+
+            return Response(species_info, status=status.HTTP_200_OK)
         except Exception as e:
-            return Response({"detail" : f"Species search failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message" : f"Species search failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # 특정 지역 + 종의 관측 로그 목록 뷰    
 class AreaSpeciesLogsView(APIView):
