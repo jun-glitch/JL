@@ -282,7 +282,7 @@ class UploadBirdPhotoView(APIView):
             )
 
             # 업로드된 파일의 Public URL 가져오기
-            image_url = supabase.storage.from_(settings.SUPABASE_STORAGE_BUCKET).get_public_url(file_name)
+            image_url = supabase.storage.from_(settings.SUPABASE_STORAGE_BUCKET).get_public_url(f'{request.user.id}/{file_name}')
 
         except Exception as e:
             return Response({"message" : f"Supabase Storage upload failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

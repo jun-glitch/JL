@@ -6,8 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 
-from .models import Species, Log
-from .serializers_fieldguide import FieldGuideOrderGroupSerializer
+from config import settings
 
 from integrations.supabase_client import supabase
 
@@ -27,93 +26,8 @@ class FieldGuideView(APIView):
     def get(self, request):
         # 프론트에서 보내는 검색 파라미터 읽기
         kwd = request.query_params.get("kwd")
-        # observed_param = request.query_params.get("observed")  # "true" | "false" | None
 
         try:
-            """
-            species_list = list(
-                species_qs.values("species_code", "common_name", "scientific_name", "order")
-            )
-            species_codes = [s["species_code"] for s in species_list]
-
-            # 유저 로그 집계 (count, last_obs_date)
-            agg = (
-                Log.objects
-                .filter(user=user, species__species_code__in=species_codes)
-                .values("species__species_code")
-                .annotate(
-                    observation_count=Count("num"),
-                    last_observed_at=Max("photo__obs_date"),
-                )
-            )
-            agg_map = {row["species__species_code"]: row for row in agg}
-
-            # cover 이미지(최근 1장)용: species별 최신 log 1개를 가져와 photo.image 사용
-            latest_logs = (
-                Log.objects
-                .filter(user=user, species__species_code__in=species_codes)
-                .select_related("photo", "species")
-                .order_by("species__species_code", "-photo__obs_date", "-reg_date", "-num")
-            )
-
-            cover_map = {}
-            for log in latest_logs:
-                if not log.species:
-                    continue
-                code = log.species.species_code
-                if code in cover_map:
-                    continue
-                photo = log.photo
-                cover_map[code] = getattr(photo, "image_url", None)
-                
-            # Species 목록을 도감 카드로 아이템화, 목별 그룹핑
-            grouped = defaultdict(list)
-            for s in species_list:
-                sid = s["species_code"]
-                a = agg_map.get(sid) # 관측했으면 row 반환, 못했으면 None
-
-                observed = a is not None
-                observation_count = int(a["observation_count"]) if observed else 0
-                last_observed_at = a["last_observed_at"] if observed else None
-                cover_image_url = cover_map.get(sid) if observed else None
-
-                item = {
-                    "species_code": sid,
-                    "common_name": s["common_name"],
-                    "scientific_name": s.get("scientific_name") or "",
-                    "order": s.get("order") or "",
-                    "observed": observed,
-                    "observation_count": observation_count,
-                    "last_observed_at": last_observed_at,
-                    "cover_image_url": cover_image_url,
-                }
-                
-                # 관측 여부 필터링
-                if observed_param == "true" and not observed:
-                    continue
-                if observed_param == "false" and observed:
-                    continue
-
-                grouped[item["order"]].append(item)
-
-            # order 내 정렬(관측한 것 우선, 그 다음 최근 관측 순)
-            groups_payload = []
-            for order_name, items in grouped.items():
-                items.sort(
-                    key=lambda x: (
-                        0 if x["observed"] else 1,
-                        x["last_observed_at"] is None,
-                        x["last_observed_at"] if x["last_observed_at"] else "",
-                        x["common_name"],
-                    ),
-                    reverse=False,
-                )
-                groups_payload.append({"order": order_name, "items": items})
-
-            # order 그룹 정렬
-            groups_payload.sort(key=lambda g: g["order"])
-            out = FieldGuideOrderGroupSerializer(groups_payload, many=True)
-            """
             # Species 먼저 필터링
             query = supabase.table('species').select('species_code', 'common_name', 'scientific_name', 'order_name', 'family_name')
             if kwd:
@@ -122,17 +36,55 @@ class FieldGuideView(APIView):
             response = query.order('order_name', desc=False).execute()
             all_data = response.data
 
+            user_logs_res = supabase.table('log').select(
+                    'species_code', 'reg_date',
+                    'photo_num(obs_date, s_filenum)'
+                ).eq('id', request.user.id).execute()
+            
+            user_logs = user_logs_res.data
+
+            user_stats = {}
+            for log in user_logs:
+                code = log['species_code']
+                photo = log.get('photo_num') # 조인된 포토 데이터
+                date = photo['obs_date'] if photo['obs_date'] else log['reg_date']
+
+                if code not in user_stats:
+                    user_stats[code] = {
+                        "observation_count": 0,
+                        "last_observed_at": date,
+                        "cover_image_url": f"{photo['s_filenum']}"
+                    }
+                
+                user_stats[code]["observation_count"] += 1
+                # 더 최신 날짜라면 이미지와 날짜 갱신
+                if date > user_stats[code]["last_observed_at"]:
+                    user_stats[code]["last_observed_at"] = date
+                    user_stats[code]["cover_image_url"] = f"{photo['s_filenum']}"
+
             grouped_res = {}
             order_names = []
 
             for entry in all_data:
                 order = entry['order_name']
+                code = entry['species_code']
 
                 if order not in grouped_res:
                     grouped_res[order] = []
                     order_names.append(order)
+
+                if code in user_stats:
+                    entry['observed'] = True
+                    entry['observation_count'] = user_stats[code]['observation_count']
+                    entry['last_observed_at'] = user_stats[code]['last_observed_at']
+                    entry['cover_image_url'] = user_stats[code]['cover_image_url']
+                else:
+                    entry['observed'] = False
+                    entry['observation_count'] = 0
+                    entry['last_observed_at'] = None
+                    entry['cover_image_url'] = None
                 
-                entry['observed'] = False
+                # entry['observed'] = False
                 grouped_res[order].append(entry)
 
             return Response({
