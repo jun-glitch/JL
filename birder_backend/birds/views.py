@@ -354,43 +354,76 @@ class AreaSummaryView(APIView):
 
     def get(self, request):
         try:
-            area = request.query_params.get('area')
-            response = supabase.table('log').select(
-                "species_code, species:species_code(common_name, scientific_name), "
-                "photo:photo_num!inner(location)"
-            ).ilike("photo.location", f"{area}%").execute()
-
-            logs = response.data or []
-        
-            if not logs:
-                return Response({"records" : []}, status=status.HTTP_200_OK) # 검색된 로그가 없는 경우 빈 배열 전송
-
-            summary_dict = {}
-            for entry in logs:
-                code = entry["species_code"]
-                species_info = entry.get("species")
-
-                if not species_info:
-                    continue
-
-                if code not in summary_dict:
-                    summary_dict[code] = {
-                        "species_code" : code,
-                        "common_name" : species_info["common_name"],
-                        "scientific_name" : species_info["scientific_name"],
-                        "observation_count" : 0
-                    }
-                summary_dict[code]["observation_count"] += 1
+            region = request.query_params.get('region')
+            district = request.query_params.get('district')
+            if not region:
+                return Response({"message" : "검색할 지역명을 선택해주세요."}, status=status.HTTP_400_BAD_REQUEST)
             
-            payload = sorted(
-                summary_dict.values(),
-                key=lambda x: x["observation_count"],
-                reverse=True
-            )
+            region_map = {
+                "충남": "충청남도",
+                "충북": "충청북도",
+                "경남": "경상남도",
+                "경북": "경상북도",
+                "전남": "전라남도",
+                "전북": "전라북도"
+            }
 
-            return Response(payload, status=status.HTTP_200_OK)
+            region = region_map.get(region, region)
+            
+            response = supabase.rpc('get_area_observation_summary', {'region' : region, 'district' : district}).execute()
+
+            return Response({
+                "region" : region,
+                "district" : district,
+                "list" : response.data
+            }, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"message" : f"Area search failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# 특정 지역 + 종의 관측 로그 목록 뷰    
+class AreaSpeciesLogsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            region = request.query_params.get("region")
+            district = request.query_params.get("district")
+            species_code = request.query_params.get('species_code')
+            # limit = int(request.query_params.get("limit", 20))
+            # offset = int(request.query_params.get("offset", 0))
+
+            print(f'전체 파라미터: {request.query_params}')
+            if not region or not district:
+                return Response({"message" : "검색할 지역명을 선택해주세요."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            if not species_code:
+                return Response({"message" : "검색할 새 종 코드가 비어있습니다."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            species_res = supabase.table('species').select('species_code', 'common_name', 'scientific_name').eq('species_code', species_code).single().execute()
+
+            response = species_res.data
+            region_map = {
+                "충남": "충청남도",
+                "충북": "충청북도",
+                "경남": "경상남도",
+                "경북": "경상북도",
+                "전남": "전라남도",
+                "전북": "전라북도"
+            }
+
+            region = region_map.get(region, region)
+
+            logs_res = supabase.rpc('get_area_observation_detail', {'region' : region, 'district' : district, 'p_species_code' : species_code}).execute()
+
+            response['records'] =  logs_res.data if logs_res.data else []
+
+            return Response(response, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(
+                {"message": f"Area species logs failed: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 # 종 관측 검색 시 일치하는 종 반환 뷰
 class SpeciesSearchView(APIView):
@@ -409,7 +442,6 @@ class SpeciesSearchView(APIView):
             return Response({"list" : response.data}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"message" : f"{kwd} 에 해당하는 종 검색 중 에러 발생: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
 
 # 특정 종 누적 관측 지도 뷰
 class SpeciesSummaryView(APIView):
@@ -445,87 +477,6 @@ class SpeciesSummaryView(APIView):
         except Exception as e:
             return Response({"message" : f"Species search failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-# 특정 지역 + 종의 관측 로그 목록 뷰    
-class AreaSpeciesLogsView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request, area: str, species_code: str):
-        try:
-            area2 = request.query_params.get("area2") # 세종특별자치도는 예외
-            limit = int(request.query_params.get("limit", 20))
-            offset = int(request.query_params.get("offset", 0))
-
-            prefix = area.strip()
-            if area2:
-                prefix += f" {area2.strip()}"
-
-            response = (
-                supabase
-                .table("log")
-                .select(
-                    "log_num, reg_date, species_code, photo_num,"
-                    "photo:photo_num(location, latitude, longitude, obs_date, s_filenum)"
-                )
-                .eq("species_code", species_code)
-                .eq("id", str(request.user.id))  
-                .ilike("photo.location", f"{prefix}%")
-                .order("reg_date", desc=True)
-                .range(offset, offset + limit - 1)
-                .execute()
-            )
-
-            rows = response.data or []
-
-            # 프론트 스펙에 맞춰 필드명 변환
-            items = []
-            for r in rows:
-                p = r.get("photo") or {}
-
-                items.append({
-                    "log_id": r.get("log_num"),
-                    "location": p.get("location",""),
-                    "rec_date": r.get("reg_date"),
-                    "obs_date": p.get("obs_date"),
-                    "latitude": p.get("latitude"),
-                    "longitude": p.get("longitude"),
-                    "image_url": p.get("s_filenum"),
-                })
-
-            return Response(items, status=status.HTTP_200_OK)
-
-        except Exception as e:
-            return Response(
-                {"message": f"Area species logs failed: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-        """
-        logs = (
-            Log.objects
-            .select_related("photo", "species")
-            .filter(
-                user=request.user,
-                photo__area_full__startswith=area,
-                species__species_code=species_code
-            )
-            .order_by("-photo__obs_date", "-reg_date", "-num")
-        )
-
-        items = []
-        for log in logs:
-            photo = log.photo
-            items.append({
-                "log_id": getattr(log, "num", log.id),
-                "location": getattr(photo, "area_full", ""),
-                "rec_date": getattr(log, "reg_date", None),  
-                "obs_date": getattr(photo, "obs_date", None),
-                "latitude": float(photo.latitude) if photo and photo.latitude is not None else None,
-                "longitude": float(photo.longitude) if photo and photo.longitude is not None else None,
-                "image_url": getattr(photo, "image_url", None) if photo else None,
-            })
-
-        out = LogItemSerializer(items, many=True)
-        return Response(out.data, status=status.HTTP_200_OK)
-        """
 # 지도 점(소수점 4자리까지 좌표 라운딩) 
 class SpeciesMapPointsView(APIView):
     permission_classes = [IsAuthenticated]

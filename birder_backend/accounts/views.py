@@ -72,7 +72,6 @@ class LoginView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        print('login')
         login_info = request.data
 
         id = login_info.get('username')

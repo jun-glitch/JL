@@ -28,16 +28,13 @@ urlpatterns = [
     # 사진 업로드 + 위경도 정규화 + 로그 생성
     path("upload/photo", UploadBirdPhotoView.as_view(), name="birds_upload"),
     # 지역명으로 종별 누적 관측 횟수
-    path("areas/", AreaSummaryView.as_view(), name="area_summary"),
+    path("areas/search/", AreaSummaryView.as_view(), name="area_summary"),
     # 특정 지역 + 종의 관측 로그 목록
-    path("areas/<str:area>/species/<str:species_code>/logs/", AreaSpeciesLogsView.as_view(), name="area_species_logs"),
+    path("areas/logs/", AreaSpeciesLogsView.as_view(), name="area_species_logs"),
 
     # 종명으로 지역별 누적 관측 횟수
     path("species/search/", SpeciesSearchView.as_view(), name="species_search"), # 사용자가 검색한 검색어에 해당하고 로그가 존재하는 종 리스트 반환
     path("species/map/", SpeciesSummaryView.as_view(), name="species_summary"), # 사용자가 종 리스트에서 선택한 특정 종의 관측 로그 반환
-
-    # 종명으로 지역별 누적 관측 횟수
-    path("species/<str:species>/", SpeciesSummaryView.as_view(), name="species_summary"),
 
     # 종별 지도
     path("map/points/", SpeciesMapPointsView.as_view(), name="species_map_points"),
