@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime
 
+import traceback
 from django.db.models import Count
 from django.db.models.functions import Round
 from django.utils import timezone
@@ -77,37 +78,54 @@ class IdentifyView(APIView):
         if not image:
             return Response({"detail": "image file required"}, status=status.HTTP_400_BAD_REQUEST)
         
+        try:
+            image.seek(0)
+            image_bytes = image.read()
+            image.seek(0)
+        except Exception as e:
+            return Response({"detail": f"failed to read image file: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
         session = BirdIdentifySession.objects.create(
             user=request.user,
             image_url=None,           
             is_finished=False,
             current_index=0,
         )
+
         try:
-            image.seek(0)
             top5 = identify_bird(image)  
+            try:
+                image.seek(0)
+            except Exception:
+                pass
+
+            if not top5:
+                session.delete()
+                return Response({"detail": "no candidates found"}, status=status.HTTP_502_BAD_GATEWAY)
+            
         except Exception as e:
             session.delete()
-            return Response({"detail": f"identify failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+            print(f"Identification error: {e}")
+            print(traceback.format_exc())
+            return Response({"detail": f"identification failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
         normalized = []
         for i, c in enumerate(top5[:5], start=1):
             if isinstance(c, dict):
-                c_rank = c.get("rank", i)
-                normalized.append({**c, "rank": c_rank})
+                normalized.append({**c, "rank": int(c.get("rank", i))})
             else:
                 normalized.append({"rank": i, "common_name_ko": str(c)})
 
-        file_path = f"identify/{uuid.uuid4().hex}_{image.name}"
-        image_bytes = image.read()
-        image.seek(0)
-
         # 4) 후보 DB 저장
         for c in normalized:
+            common = c.get("common_name_ko")
+            if not common:
+                continue
+
             BirdCandidate.objects.create(
                 session=session,
                 rank=c.get("rank", 0),
-                common_name_ko=c["common_name_ko"],
+                common_name_ko=common,
                 scientific_name=c.get("scientific_name", ""),
                 short_description=c.get("short_description", ""),
                 wikimedia_image_url=c.get("wikimedia_image_url", ""),
