@@ -138,50 +138,48 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
     required DateTime? end,
   }) async {
     if (start == null || end == null) return [];
+
+    final dio = ApiClient().dio;
+    final speciesCode = widget.speciesCode.trim();
+
+    debugPrint('--- MAP API 요청 확인 ---');
+    debugPrint('species_code: "$speciesCode"');
+    debugPrint('start: ${_fmt(start)}');
+    debugPrint('end: ${_fmt(end)}');
+
     try {
-      final dio = ApiClient().dio;
-
-      debugPrint('--- API 요청 확인 ---');
-      debugPrint('species_code: "${widget.speciesCode}"'); // 따옴표를 넣어 공백 확인
-      debugPrint('start: ${_fmt(start!)}');
-      debugPrint('end: ${_fmt(end!)}');
-
       final res = await dio.get(
         '/api/birds/species/map/',
         queryParameters: {
-          'species_code': widget.speciesCode,
+          'species_code': speciesCode,
           'start': _fmt(start),
           'end': _fmt(end),
         },
       );
-      debugPrint('Raw Server Data: ${res.data}'); // 전체 구조 확인
+
+      debugPrint('map status=${res.statusCode}');
+      debugPrint('map uri=${res.realUri}');
+      debugPrint('map data=${res.data}');
 
       final data = res.data;
-      if (data is! Map || data['records'] == null) return [];
+      if (data is! Map) return [];
 
-      final List<LatLng> resultPoints = [];
-      final speciesList = data['records'] as List;
+      final points = (data['records'] as List?) ?? [];
 
-      for (var species in speciesList) {
-        final observarionLogs = species['records'] as List?;
-        if (observarionLogs != null) {
-          for (var log in observarionLogs) {
-            final lat = (log['latitude'] as num).toDouble();
-            final lng = (log['longitude'] as num).toDouble();
-            resultPoints.add(LatLng(lat, lng));
-          }
-        }
-      }
-
-      return resultPoints;
-    } catch (e) {
-      if (e is DioException && e.response?.statusCode == 404) {
-        debugPrint('해당 기간에 데이터가 없습니다.');
-        return []; // 빈 지도
-    }
-      rethrow; // 에러 메시지 표시
+      return points.map((p) {
+        final m = Map<String, dynamic>.from(p);
+        final lat = (m['latitude'] as num).toDouble();
+        final lng = (m['longitude'] as num).toDouble();
+        return LatLng(lat, lng);
+      }).toList();
+    } on DioException catch (e) {
+      debugPrint('❌ map DioException status=${e.response?.statusCode}');
+      debugPrint('❌ map DioException uri=${e.requestOptions.uri}');
+      debugPrint('❌ map DioException data=${e.response?.data}');
+      rethrow;
     }
   }
+
 
   Future<void> _loadKoreaOutline() async {
     final data = await rootBundle.loadString('assets/geo/korea_sido.geojson');
@@ -236,6 +234,65 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildKoreaMapWithOverlay({
+    required List<LatLng> points,
+    String? overlayMessage,
+    bool showLoading = false,
+  }) {
+    return Stack(
+      children: [
+        _buildKoreaMap(points), //아웃라인
+
+        if (showLoading)
+          Positioned.fill(
+            child: Container(
+              color: Colors.black.withOpacity(0.05),
+              child: const Center(child: CircularProgressIndicator()),
+            ),
+          ),
+
+        if (overlayMessage != null && overlayMessage.isNotEmpty)
+          Positioned(
+            left: 12,
+            right: 12,
+            bottom: 12,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.92),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF9CB9F9), width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    blurRadius: 10,
+                    color: Colors.black.withOpacity(0.08),
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      overlayMessage,
+                      style: const TextStyle(
+                        fontFamily: 'Paperlogy',
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -401,13 +458,25 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
                         end: _endDate,
                       ),
                       builder: (context, pointSnap) {
+                        // 로딩중 (지도 아웃라인, 로딩)
+                        if (pointSnap.connectionState != ConnectionState.done) {
+                          return _buildKoreaMapWithOverlay(
+                            points: const [],
+                            showLoading: true,
+                          );
+                        }
+
+                        // 에러 (지도 아웃라인, 에러 메세지)
                         if (pointSnap.hasError) {
-                          return Center(child: Text('포인트 로드 에러: ${pointSnap.error}'));
+                          return _buildKoreaMapWithOverlay(
+                            points: const [],
+                            overlayMessage: '포인트 로드 에러: ${pointSnap.error}',
+                          );
                         }
-                        if (!pointSnap.hasData) {
-                          return const Center(child: CircularProgressIndicator());
-                        }
-                        return _buildKoreaMap(pointSnap.data!);
+
+                        // 정상
+                        final pts = pointSnap.data ?? const <LatLng>[];
+                        return _buildKoreaMapWithOverlay(points: pts);
                       },
                     );
                   },
@@ -422,4 +491,33 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
     );
   }
 
+}
+
+class SpeciesMapRecord {
+  final dynamic logId;
+  final dynamic obsDate;
+  final String areaFull;
+  final double? latitude;
+  final double? longitude;
+  final String? photoUrl;
+
+  SpeciesMapRecord({
+    required this.logId,
+    required this.obsDate,
+    required this.areaFull,
+    required this.latitude,
+    required this.longitude,
+    required this.photoUrl,
+  });
+
+  factory SpeciesMapRecord.fromJson(Map<String, dynamic> json) {
+    return SpeciesMapRecord(
+      logId: json['log_id'],
+      obsDate: json['obs_date'],
+      areaFull: (json['area_full'] ?? '').toString(),
+      latitude: (json['latitude'] as num?)?.toDouble(),
+      longitude: (json['longitude'] as num?)?.toDouble(),
+      photoUrl: json['photo_url']?.toString(),
+    );
+  }
 }
