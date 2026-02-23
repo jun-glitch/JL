@@ -86,7 +86,7 @@ class IdentifyView(APIView):
         )
 
         try:
-            top5 = identify_bird(image)  
+            top5 = identify_bird(image, supabase=supabase)  
             try:
                 image.seek(0)
             except Exception:
