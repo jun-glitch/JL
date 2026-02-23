@@ -405,6 +405,8 @@ class AreaSpeciesLogsView(APIView):
             region = request.query_params.get("region")
             district = request.query_params.get("district")
             species_code = request.query_params.get('species_code')
+            start = request.query_params.get('start')
+            end = request.query_params.get('end')
             # limit = int(request.query_params.get("limit", 20))
             # offset = int(request.query_params.get("offset", 0))
 
@@ -429,7 +431,9 @@ class AreaSpeciesLogsView(APIView):
 
             region = region_map.get(region, region)
 
-            logs_res = supabase.rpc('get_area_observation_detail', {'region' : region, 'district' : district, 'p_species_code' : species_code}).execute()
+            logs_res = supabase.rpc('get_area_observation_detail', {
+                'region' : region, 'district' : district, 'p_species_code' : species_code, 'p_start_date' : start, 'p_end_date' : end
+                }).execute()
 
             response['records'] =  logs_res.data if logs_res.data else []
 
@@ -465,16 +469,19 @@ class SpeciesSummaryView(APIView):
 
     def get(self, request):
         try:
-            kwd = request.query_params.get('kwd')
+            kwd = request.query_params.get('species_code')
+            start = request.query_params.get('start')
+            end = request.query_params.get('end')
 
             if not kwd:
                 return Response({"message" : "관측 로그를 검색할 새 종을 입력해주세요."}, status=status.HTTP_400_BAD_REQUEST)
 
-            species_res = supabase.table('species').select('species_code', 'common_name', 'scientific_name').eq('species_code', kwd).single().execute()
-            species_info = species_res.data # {'common_name' : '', 'scientific_name' : ''}
+            species_res = supabase.table('species').select('species_code', 'common_name', 'scientific_name'
+                ).eq('species_code', kwd).single().execute()
+            species_info = species_res.data
 
             # log_num, species_code, common_name, scientific_name, longitude, latitude, location, obs_date, s_fileNum
-            log_res = supabase.rpc("get_logs_by_species_code", {"p_species_code": kwd}).execute()
+            log_res = supabase.rpc("get_logs_by_species_code", {"p_species_code": kwd, 'p_start_date' : start, 'p_end_date' : end}).execute()
             result = log_res.data
 
             observation_count = result.get('observation_count', 0)
