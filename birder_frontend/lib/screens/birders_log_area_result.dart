@@ -1,3 +1,4 @@
+import 'package:birder_frontend/models/api_client.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -10,6 +11,90 @@ class BirdersLogAreaResult extends StatefulWidget {
 }
 
 class _BirdersLogAreaResultState extends State<BirdersLogAreaResult> {
+
+  Map<String, dynamic> _args(BuildContext context) {
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args is Map<String, dynamic>) return args;
+    return {};
+  }
+
+  String _titleAreaLine(BuildContext context) {
+    final a = _args(context);
+    final region = (a['region'] ?? '').toString();
+    final district = (a['district'] ?? '').toString();
+    final s = '$region $district'.trim();
+    return s.isEmpty ? '지역' : s;
+  }
+
+  String _titleSpeciesLine(BuildContext context) {
+    final a = _args(context);
+    final speciesName = (a['species_name'] ?? '').toString().trim();
+    return speciesName.isEmpty ? '상세 관측 기록' : '$speciesName 상세 관측 기록';
+  }
+
+  bool _loadingLogs = false;
+  String? _logError;
+  List<ObservationLog> _logs = [];
+
+  Future<void> _fetchLogs() async {
+    final ctx = context;
+    final a = _args(ctx);
+
+    final region = (a['region'] ?? '').toString();
+    final district = (a['district'] ?? '').toString();
+    final speciesCode = (a['species_code'] ?? '').toString();
+
+
+    if (region.isEmpty || district.isEmpty || speciesCode.isEmpty) {
+      setState(() => _logError = '필수 파라미터가 비어있습니다.');
+      return;
+    }
+
+    setState(() {
+      _loadingLogs = true;
+      _logError = null;
+      _logs = [];
+    });
+
+    try {
+      final dio = ApiClient().dio;
+
+      final qp = <String, dynamic>{
+        'region': region,
+        'district': district,
+        'species_code': speciesCode,
+      };
+      
+      if (_startDate != null) qp['start'] = _startDate!.toIso8601String();
+      if (_endDate != null) qp['end'] = _endDate!.toIso8601String();
+
+      final res = await dio.get(
+          '/api/birds/areas/logs/', 
+          queryParameters: qp);
+
+      final data = Map<String, dynamic>.from(res.data);
+      final records = (data['records'] as List?) ?? [];
+
+      final logs = records
+          .map((e) => ObservationLog.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+
+      logs.sort((a, b) {
+        final ad = a.obsDate ?? a.regDate ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final bd = b.obsDate ?? b.regDate ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return bd.compareTo(ad);
+      });
+
+      if (!mounted) return;
+      setState(() => _logs = logs);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _logError = '상세 기록을 불러오지 못했어요: $e');
+    } finally {
+      if (!mounted) return;
+      setState(() => _loadingLogs = false);
+    }
+  }
 
   String _fmtDate(DateTime dt) {
     final m = dt.month.toString().padLeft(2, '0');
@@ -24,19 +109,30 @@ class _BirdersLogAreaResultState extends State<BirdersLogAreaResult> {
     return '$hh:$mm:$ss';
   }
 
+  String _fmtDateTimeOrDash(DateTime? dt) {
+    if (dt == null) return '-';
+    return '${_fmtDate(dt)} ${_fmtTime(dt)}';
+  }
 
   DateTime? _startDate;
   DateTime? _endDate;
+
 
   @override
   void initState() {
     super.initState();
 
-    final now = DateTime.now();
-    _startDate = DateTime(now.year, now.month, 1);
-    _endDate = DateTime(now.year, now.month + 1, 0); // 이번 달 마지막 날
-
+   // final now = DateTime.now();
+    _startDate = null; //DateTime(2000, 1, 1);
+    _endDate = null; //DateTime(now.year, now.month + 1, 0); // 이번 달 마지막 날
+    
+    WidgetsBinding.instance.addPostFrameCallback((_){
+      _fetchLogs();
+    });
   }
+
+
+
 
   String _fmt(DateTime d) {
     final y = d.year.toString().padLeft(4, '0');
@@ -45,16 +141,6 @@ class _BirdersLogAreaResultState extends State<BirdersLogAreaResult> {
     return '$y/$m/$day';
   }
 
-
-  String _resolveAreaName(BuildContext context) {
-
-    // 이전 화면에서 arguments로 넘겨준 값 사용
-    final args = ModalRoute.of(context)?.settings.arguments;
-    if (args is String && args.trim().isNotEmpty) return args.trim();
-
-    // 임시 기본값
-    return '대구광역시';
-  }
 
   Future<void> _pickStartDate() async {
     final now = DateTime.now();
@@ -73,6 +159,7 @@ class _BirdersLogAreaResultState extends State<BirdersLogAreaResult> {
         _endDate = picked;
       }
     });
+    _fetchLogs();
   }
 
   Future<void> _pickEndDate() async {
@@ -198,14 +285,28 @@ class _BirdersLogAreaResultState extends State<BirdersLogAreaResult> {
               const SizedBox(height: 14),
               // (종명) 지역별 누적 관측 기록
               Center(
-                child: Text(
-                  '${_resolveAreaName(context)} 상세 관측 기록',
-                    style: TextStyle(
-                    fontFamily: 'Paperlogy',
-                    fontWeight: FontWeight.w500,
-                    fontSize: 24,
-                    color: Colors.black,
-                  ),
+                child: Column(
+                  children: [
+                    Text(
+                      _titleAreaLine(context), // 서울 서대문구
+                      style: const TextStyle(
+                        fontFamily: 'Paperlogy',
+                        fontWeight: FontWeight.w500,
+                        fontSize: 22,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _titleSpeciesLine(context), //큰부리까마귀
+                      style: const TextStyle(
+                        fontFamily: 'Paperlogy',
+                        fontWeight: FontWeight.w500,
+                        fontSize: 22,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
@@ -376,37 +477,23 @@ class _BirdersLogAreaResultState extends State<BirdersLogAreaResult> {
                                 style: const TextStyle(
                                   fontFamily: 'Paperlogy',
                                   fontWeight: FontWeight.w400,
-                                  fontSize: 16,
+                                  fontSize: 15,
                                   color: Colors.black87,
                                 ),
                               ),
                             ),
                           ),
+
                           Expanded(
                             child: Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    _fmtDate(log.observedAt),
-                                    style: const TextStyle(
-                                      fontFamily: 'Paperlogy',
-                                      fontWeight: FontWeight.w400,
-                                      fontSize: 14,
-                                      color: Colors.black87,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    _fmtTime(log.observedAt),
-                                    style: const TextStyle(
-                                      fontFamily: 'Paperlogy',
-                                      fontWeight: FontWeight.w400,
-                                      fontSize: 14,
-                                      color: Colors.black87,
-                                    ),
-                                  ),
-                                ],
+                              child: Text(
+                                _fmtDateTimeOrDash(log.displayDate),
+                                style: const TextStyle(
+                                  fontFamily: 'Paperlogy',
+                                  fontWeight: FontWeight.w400,
+                                  fontSize: 15,
+                                  color: Colors.black87,
+                                ),
                               ),
                             ),
                           ),
@@ -423,34 +510,32 @@ class _BirdersLogAreaResultState extends State<BirdersLogAreaResult> {
   }
 
 }
+
 class ObservationLog {
   final String location;    // 위도 경도
-  final DateTime observedAt;
+  final DateTime? obsDate;
+  final DateTime? regDate;
 
   ObservationLog({
     required this.location,
-    required this.observedAt,
+    required this.obsDate,
+    required this.regDate,
   });
+
+  static DateTime? _parseDt(dynamic v) {
+    if (v == null) return null;
+    final s = v.toString().trim();
+    if (s.isEmpty) return null;
+    return DateTime.tryParse(s);
+  }
+
+  DateTime? get displayDate => obsDate ?? regDate;
 
   factory ObservationLog.fromJson(Map<String, dynamic> json) {
     return ObservationLog(
-      location: json['location'] as String,
-      observedAt: DateTime.parse(json['observed_at'] as String),
+      location: (json['location'] ?? '').toString(),
+      obsDate: _parseDt(json['obs_date']),
+      regDate: _parseDt(json['reg_date']),
     );
   }
 }
-
-bool _loadingLogs = false;
-String? _logError;
-List<ObservationLog> _logs = [
-  ObservationLog(location: '35°N 128°E', observedAt: DateTime(2025, 10, 17, 16, 34, 23)),
-  ObservationLog(location: '35°N 128°E', observedAt: DateTime(2025, 10, 17, 11, 34, 23)),
-  ObservationLog(location: '35°N 128°E', observedAt: DateTime(2025, 10, 16,  9, 34, 23)),
-  ObservationLog(location: '35°N 128°E', observedAt: DateTime(2025, 10, 14, 15, 34, 23)),
-  ObservationLog(location: '35°N 128°E', observedAt: DateTime(2025, 10, 14, 10, 34, 23)),
-  ObservationLog(location: '35°N 128°E', observedAt: DateTime(2025, 10, 11, 12, 34, 23)),
-  ObservationLog(location: '35°N 128°E', observedAt: DateTime(2025, 10, 10,  7, 34, 23)),
-  ObservationLog(location: '35°N 128°E', observedAt: DateTime(2025, 10,  6, 22, 34, 23)),
-  ObservationLog(location: '35°N 128°E', observedAt: DateTime(2025, 10,  6, 18, 34, 23)),
-  ObservationLog(location: '35°N 128°E', observedAt: DateTime(2025, 10,  3, 10, 34, 23)),
-];

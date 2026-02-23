@@ -31,9 +31,8 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
   void initState() {
     super.initState();
 
-    final now = DateTime.now();
-    _startDate = DateTime(2020, 1, 1);
-    _endDate = DateTime(now.year, now.month + 1, 0); // 이번 달 마지막 날
+    _startDate = null; //DateTime(2000, 1, 1);
+    _endDate = null; //DateTime(now.year, now.month + 1, 0); // 이번 달 마지막 날
 
     _outlineFuture = _loadKoreaOutline();
   }
@@ -137,24 +136,24 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
     required DateTime? start,
     required DateTime? end,
   }) async {
-    if (start == null || end == null) return [];
 
     final dio = ApiClient().dio;
     final speciesCode = widget.speciesCode.trim();
 
+    final qp = <String, dynamic>{
+      'species_code': speciesCode,
+    };
+
+    if (start != null) qp['start'] = _fmt(start);
+    if (end != null) qp['end'] = _fmt(end);
+
     debugPrint('--- MAP API 요청 확인 ---');
     debugPrint('species_code: "$speciesCode"');
-    debugPrint('start: ${_fmt(start)}');
-    debugPrint('end: ${_fmt(end)}');
 
     try {
       final res = await dio.get(
         '/api/birds/species/map/',
-        queryParameters: {
-          'species_code': speciesCode,
-          'start': _fmt(start),
-          'end': _fmt(end),
-        },
+        queryParameters: qp,
       );
 
       debugPrint('map status=${res.statusCode}');

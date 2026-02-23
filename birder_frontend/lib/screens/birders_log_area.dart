@@ -13,19 +13,28 @@ class BirdersLogArea extends StatefulWidget {
 
 class SpeciesCount {
   final String species;
+  final String speciesCode;
   final int count;
 
-  SpeciesCount({required this.species, required this.count});
+  SpeciesCount({
+    required this.species,
+    required this.speciesCode,
+    required this.count
+  });
 
   factory SpeciesCount.fromJson(Map<String, dynamic> json) {
     final species =
     (json['species'] ?? json['common_name'] ?? json['scientific_name'] ?? json['species_code'] ?? '').toString();
+
+    final speciesCode =
+    (json['species_code'] ?? json['code'] ?? '').toString();
 
     final countRaw =
     (json['count'] ?? json['observation_count'] ?? json['cnt'] ?? 0);
 
     return SpeciesCount(
       species: species,
+      speciesCode: speciesCode,
       count: (countRaw as num).toInt(),
     );
   }
@@ -152,31 +161,6 @@ class _BirdersLogAreaState extends State<BirdersLogArea> {
                   fontWeight: FontWeight.w600,
                   fontSize: 27,
                   color: Colors.black,
-                ),
-              ),
-              const Spacer(), // 임시 버튼 (DB + 로그 연결 후 삭제)
-              SizedBox(
-                height: 34,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const BirdersLogAreaResult()),
-                    );
-                  },
-                  child: Text(
-                    '임시',
-                    style: TextStyle(
-                        fontFamily: 'Paperlogy',
-                        fontWeight: FontWeight.w400,
-                        fontSize: 16
-                    ),
-                  ),
                 ),
               ),
             ],
@@ -410,38 +394,97 @@ class _BirdersLogAreaState extends State<BirdersLogArea> {
     }
 
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFFEFF6FF),
         borderRadius: BorderRadius.circular(10),
       ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: DataTable(
-          headingTextStyle: TextStyle(
-            fontFamily: 'Paperlogy',
-            fontWeight: FontWeight.w700,
-            fontSize: 14,
-            color: Colors.black87,
-          ),
-          dataTextStyle: TextStyle(
-            fontFamily: 'Paperlogy',
-            fontSize: 14,
-            color: Colors.black87,
-          ),
-          columns: const [
-            DataColumn(label: Text('종(학술명)')),
-            DataColumn(label: Text('누적 관측 횟수'), numeric: true),
-          ],
-          rows: _summary.map((e) {
-            return DataRow(
-              cells: [
-                DataCell(Text(e.species)),
-                DataCell(Text('${e.count}')),
-              ],
-            );
-          }).toList(),
+      child: DataTable(
+        // 화면 안에 자연스럽게 들어오게 간격 조정
+        horizontalMargin: 12,
+        columnSpacing: 18,
+
+        headingTextStyle: const TextStyle(
+          fontFamily: 'Paperlogy',
+          fontWeight: FontWeight.w700,
+          fontSize: 14,
+          color: Colors.black87,
         ),
+        dataTextStyle: const TextStyle(
+          fontFamily: 'Paperlogy',
+          fontSize: 14,
+          color: Colors.black87,
+        ),
+
+        columns: const [
+          DataColumn(
+            label: Align(
+              alignment: Alignment.centerLeft,
+              child: Text('종명'),
+            ),
+          ),
+          DataColumn(
+            numeric: true,
+            label: Align(
+              alignment: Alignment.centerRight,
+              child: Text('누적 관측 횟수'),
+            ),
+          ),
+        ],
+
+        rows: _summary.map((e) {
+          return DataRow(
+            cells: [
+              DataCell(
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    e.species,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
+                  ),
+                ),
+              ),
+
+              DataCell(
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    '${e.count}',
+                    style: const TextStyle(
+                      decoration: TextDecoration.underline,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                onTap: () {
+                  if (selectedDistrict == null) return;
+
+                  debugPrint(
+                    '상세이동 args = region:$selectedRegion district:$selectedDistrict '
+                        'species:${e.species} code:${e.speciesCode}',
+                  );
+
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const BirdersLogAreaResult(),
+                      settings: RouteSettings(
+                        arguments: {
+                          'region': selectedRegion,
+                          'district': selectedDistrict,
+                          'species_name': e.species,
+                          'species_code': e.speciesCode,
+                        },
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          );
+        }).toList(),
       ),
     );
   }

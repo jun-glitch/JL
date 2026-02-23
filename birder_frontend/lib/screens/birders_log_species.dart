@@ -13,15 +13,7 @@ class BirdersLogSpecies extends StatefulWidget {
 class _BirdersLogSpeciesState extends State<BirdersLogSpecies> {
   final TextEditingController _searchCtrl = TextEditingController();
 
-  /* 임시 리스트
-  final List<String> _allSpecies = const [
-    '참새',
-    '까치',
-    '비둘기',
-    '직박구리',
-    '까마귀',
-  ];
-   */
+
 
   List<Map<String, dynamic>> _serverResults = [];
   bool _loading = false;
