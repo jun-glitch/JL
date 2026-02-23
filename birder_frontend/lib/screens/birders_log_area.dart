@@ -1,3 +1,4 @@
+import 'package:birder_frontend/models/api_client.dart';
 import 'package:birder_frontend/screens/birders_log_area_result.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -17,9 +18,15 @@ class SpeciesCount {
   SpeciesCount({required this.species, required this.count});
 
   factory SpeciesCount.fromJson(Map<String, dynamic> json) {
+    final species =
+    (json['species'] ?? json['common_name'] ?? json['scientific_name'] ?? json['species_code'] ?? '').toString();
+
+    final countRaw =
+    (json['count'] ?? json['observation_count'] ?? json['cnt'] ?? 0);
+
     return SpeciesCount(
-      species: json['species'] as String,
-      count: (json['count'] as num).toInt(),
+      species: species,
+      count: (countRaw as num).toInt(),
     );
   }
 }
@@ -310,11 +317,7 @@ class _BirdersLogAreaState extends State<BirdersLogArea> {
     ),
     );
   }
-  final Dio _dio = Dio(BaseOptions(
-    baseUrl: 'http://10.0.2.2:8000', // 에뮬레이터면 10.0.2.2
-    connectTimeout: const Duration(seconds: 5),
-    receiveTimeout: const Duration(seconds: 10),
-  ));
+
 
   bool _loadingSummary = false;
   String? _summaryError;
@@ -330,15 +333,23 @@ class _BirdersLogAreaState extends State<BirdersLogArea> {
     });
 
     try {
-      final res = await _dio.get(
-        '/api/observations/summary',
-        queryParameters: {
-          'region': selectedRegion,
-          'district': selectedDistrict,
-        },
+      final dio = ApiClient().dio;
+
+      final qp = <String, dynamic>{'region': selectedRegion};
+      if (selectedDistrict != null && selectedDistrict!.isNotEmpty) {
+        qp['district'] = selectedDistrict;
+      }
+
+      final res = await dio.get(
+        '/api/birds/areas/search/',
+        queryParameters: qp,
       );
 
-      final list = (res.data as List)
+
+      final data = Map<String, dynamic>.from(res.data);
+      final listJson = (data['list'] as List?) ?? [];
+
+      final list = listJson
           .map((e) => SpeciesCount.fromJson(Map<String, dynamic>.from(e)))
           .toList();
 
