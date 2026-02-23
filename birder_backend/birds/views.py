@@ -78,13 +78,6 @@ class IdentifyView(APIView):
         if not image:
             return Response({"detail": "image file required"}, status=status.HTTP_400_BAD_REQUEST)
         
-        try:
-            image.seek(0)
-            image_bytes = image.read()
-            image.seek(0)
-        except Exception as e:
-            return Response({"detail": f"failed to read image file: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
-
         session = BirdIdentifySession.objects.create(
             user=request.user,
             image_url=None,           
@@ -147,13 +140,15 @@ class IdentifyNextView(APIView):
             return Response(BirdIdentifySessionSerializer(session).data)
 
         # 다음 후보 새 반환
-        candidates = session.candidates.order_by("rank")
-        if session.current_index >= candidates.count():
+        candidates_qs = session.candidates.order_by("rank")
+        total = candidates_qs.count()
+
+        if session.current_index >= total:
             session.is_finished = True
-            session.save()
+            session.save(update_fields=["is_finished"])
             return Response({"detail": "no more candidates", "is_finished": True, "reupload_required": True,})
 
-        candidate = candidates[session.current_index]
+        candidate = candidates_qs[session.current_index]
         return Response({
             "session_id": session.id,
             "index": session.current_index,
@@ -172,15 +167,15 @@ class IdentifyAnswerView(APIView):
         if answer not in ["yes", "no"]:
             return Response({"detail": "answer must be 'yes' or 'no'"}, status=status.HTTP_400_BAD_REQUEST)
 
-        candidates = session.candidates.order_by("rank")
-        total = candidates.count()
+        candidates_qs = session.candidates.order_by("rank")
+        total = candidates_qs.count()
 
         if session.current_index >= total:
             session.is_finished = True
-            session.save()
+            session.save(update_fields=["is_finished"])
             return Response({"detail": "no more candidates", "is_finished": True})
 
-        current_candidate = candidates[session.current_index]
+        current_candidate = candidates_qs[session.current_index]
 
         # answer == "yes" → 확정
         if answer == "yes":
@@ -195,8 +190,25 @@ class IdentifyAnswerView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            lat, lng, obs_date = extract_exif_data(image)
-            image.seek(0)
+            try:
+                image.seek(0)
+                image_bytes = image.read()
+                image.seek(0)
+            except Exception as e:
+                print(f"[IdentifyAnswerView] failed to read image: {e}")
+                print(traceback.format_exc())
+                return Response({"detail": f"failed to read image: {e}"}, status=status.HTTP_400_BAD_REQUEST)
+
+            # EXIF 추출(실패해도 업로드는 진행)
+            try:
+                lat, lng, obs_date = extract_exif_data(image)
+            except Exception:
+                lat, lng, obs_date = None, None, None
+            finally:
+                try:
+                    image.seek(0)
+                except Exception:
+                    pass
 
             try:
                 file_path = f"identify_confirm/{uuid.uuid4().hex}_{image.name}"
@@ -216,6 +228,8 @@ class IdentifyAnswerView(APIView):
                     return Response({"detail": "failed to get public url"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
             except Exception as e:
+                print(f"[IdentifyAnswerView] Supabase storage upload failed: {e}")
+                print(traceback.format_exc())
                 return Response({"detail": f"storage upload failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
             
@@ -240,10 +254,12 @@ class IdentifyAnswerView(APIView):
                 except Exception:
                     location = "UNKNOWN"
 
+            species = getattr(current_candidate, "species", None)
+
             Log.objects.create(
                 user=request.user,
                 photo=photo,
-                species=current_candidate.species,
+                species=species,
                 location=location,
             )
 
@@ -258,7 +274,7 @@ class IdentifyAnswerView(APIView):
 
         if session.current_index >= total:
             session.is_finished = True
-            session.save()
+            session.save(update_fields=["current_index", "is_finished"])
             return Response({
                 "detail": "no more candidates",
                 "is_finished": True,
@@ -266,7 +282,7 @@ class IdentifyAnswerView(APIView):
                 "next_index": session.current_index,
             })
 
-        session.save()
+        session.save(update_fields=["current_index"])
         return Response({
             "detail": "next",
             "next_index": session.current_index,
