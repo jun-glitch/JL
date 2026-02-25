@@ -68,6 +68,8 @@ def extract_exif_data(image_file):
         print(f"EXIF 추출 에러: {e}")
     return lat, lng, obs_date
 
+# 세션 불필요
+"""
 class IdentifyView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
@@ -154,140 +156,7 @@ class IdentifyNextView(APIView):
             "index": session.current_index,
             "candidate": BirdCandidateSerializer(candidate).data,
         })
-
-# 사용자가 후보 새에 대해 처리하는 view
-class IdentifyAnswerView(APIView):
-    permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]
-
-    def post(self, request, session_id: int):
-        session = get_object_or_404(BirdIdentifySession, id=session_id, user=request.user)
-
-        answer = request.data.get("answer")  # "yes" / "no"
-        if answer not in ["yes", "no"]:
-            return Response({"detail": "answer must be 'yes' or 'no'"}, status=status.HTTP_400_BAD_REQUEST)
-
-        candidates_qs = session.candidates.order_by("rank")
-        total = candidates_qs.count()
-
-        if session.current_index >= total:
-            session.is_finished = True
-            session.save(update_fields=["is_finished"])
-            return Response({"detail": "no more candidates", "is_finished": True})
-
-        current_candidate = candidates_qs[session.current_index]
-
-        # answer == "yes" → 확정
-        if answer == "yes":
-            image = request.FILES.get("image")
-            if not image:
-                return Response(
-                    {
-                        "detail": "image file required to confirm (reupload)",
-                        "reupload_required": True,
-                        "is_finished": False,
-                    },
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            try:
-                image.seek(0)
-                image_bytes = image.read()
-                image.seek(0)
-            except Exception as e:
-                print(f"[IdentifyAnswerView] failed to read image: {e}")
-                print(traceback.format_exc())
-                return Response({"detail": f"failed to read image: {e}"}, status=status.HTTP_400_BAD_REQUEST)
-
-            # EXIF 추출(실패해도 업로드는 진행)
-            try:
-                lat, lng, obs_date = extract_exif_data(image)
-            except Exception:
-                lat, lng, obs_date = None, None, None
-            finally:
-                try:
-                    image.seek(0)
-                except Exception:
-                    pass
-
-            try:
-                file_path = f"identify_confirm/{uuid.uuid4().hex}_{image.name}"
-                image_bytes = image.read()
-                image.seek(0)
-
-                upload_res = supabase.storage.from_("bird_photos").upload(
-                    file_path,
-                    image_bytes,
-                    {"content-type": image.content_type or "image/jpeg"},
-                )
-                if getattr(upload_res, "error", None):
-                    return Response({"detail": "supabase upload failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-                image_url = get_public_url("bird_photos", file_path)
-                if not image_url:
-                    return Response({"detail": "failed to get public url"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-            except Exception as e:
-                print(f"[IdentifyAnswerView] Supabase storage upload failed: {e}")
-                print(traceback.format_exc())
-                return Response({"detail": f"storage upload failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-            
-            session.selected_candidate = current_candidate
-            session.is_finished = True
-            session.image_url = image_url  
-            session.latitude = lat
-            session.longitude = lng
-            session.save()
-
-            photo = Photo.objects.create(
-                image_url=image_url,
-                latitude=lat,
-                longitude=lng,
-                obs_date=obs_date or timezone.now(),
-            )
-
-            location = "UNKNOWN"
-            if lat is not None and lng is not None:
-                try:
-                    location = normalize_area_from_latlon(float(lat), float(lng))
-                except Exception:
-                    location = "UNKNOWN"
-
-            species = getattr(current_candidate, "species", None)
-
-            Log.objects.create(
-                user=request.user,
-                photo=photo,
-                species=species,
-                location=location,
-            )
-
-            return Response({
-                "detail": "selected",
-                "selected": BirdCandidateSerializer(current_candidate).data,
-                "image_url": image_url,
-                "is_finished": True,
-            })
-        
-        session.current_index += 1
-
-        if session.current_index >= total:
-            session.is_finished = True
-            session.save(update_fields=["current_index", "is_finished"])
-            return Response({
-                "detail": "no more candidates",
-                "is_finished": True,
-                "reupload_required": True,
-                "next_index": session.current_index,
-            })
-
-        session.save(update_fields=["current_index"])
-        return Response({
-            "detail": "next",
-            "next_index": session.current_index,
-            "is_finished": False,
-        })
+"""
 
 # 사진 저장 api
 class UploadBirdPhotoView(APIView):
@@ -331,38 +200,72 @@ class UploadBirdPhotoView(APIView):
             }
         
             db_photo_res = supabase.table("photo").insert(photo_data).execute()
+            photo_num = db_photo_res[0].get('photo_num')
         except Exception as e:
             return Response({"message" : f"Supabase Photo table upload failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        #image.seek(0)
-        #res_list = identify_bird(image)
+        
+        image.seek(0)
 
-        #print(res_list)
+        # ai에 새 사진 판별 요청
+        try:
 
-        return Response({"candidates" : []}, status=status.HTTP_200_OK)
+            candidates = identify_bird(image) # rank, species_code, common_name_ko, scientific_name, confidence, wikimedia_image_url
 
-# log 테이블 업로드
-class UploadLogView(APIView):
-        permission_classes = [IsAuthenticated]
+            # 추가) 후보가 반환되지 않은 경우...
 
-        def post(self, request):
-            photo_num = request.data.get('photo_num')
-            species_code = request.data.get('species_code')
-    
-            # 4) log 테이블에 인스턴스 추가
+
+            for candidate in candidates:
+                species_code = candidate['species_code']
+                detail = supabase.table('species').select('detail').eq('species_code', species_code).single().execute()
+                if not detail:
+                    continue
+
+                candidate['detail'] = detail
+        
+        except Exception as e:
+            return Response({"message" : f"AI identification Error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({
+            "candidates" : candidates,
+            "photo_num" : photo_num
+        }, status=status.HTTP_200_OK)
+
+
+# 사용자가 선택한 후보 새에 대해 log 테이블에 저장하는 View
+class IdentifyAnswerView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        photo_num = request.data.get('photo_num')
+        species_code = request.data.get('species_code') # 만약 후보가 선택되지 않았다면 None
+
+        if not species_code: # 선택된 후보가 없는 경우
             try:
-                log_data = {
-                    "photo_num" : photo_num,
-                    "species_code" : species_code,
-                    "reg_date" : datetime.now().isoformat(),
-                    "id" : request.user.id
-                }
+                del_res = supabase.table('photo').delete().eq('photo_num', photo_num).execute() # 이미 저장된 사용자가 업로드한 사진에 대해 photo 테이블 인스턴스 삭제
+                img_url = del_res[0].get('s_filenum')
 
-                supabase.table("log").insert(log_data).execute()
+                file_path = img_url.split(f'{settings.SUPABASE_STORAGE_BUCKET}/')[-1]
+
+                supabase.storage.from_(settings.SUPABASE_STORAGE_BUCKET).remove([file_path]) # storage에 저장된 사용자가 업로드한 사진 삭제
+                return Response({"message" : "업로드된 사진이 삭제되었습니다."}, status=status.HTTP_200_OK)
             except Exception as e:
-                return Response({"message" : f"Supabase log table upload failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            
-            return Response({"message" : "로그 추가가 완료되었습니다."},status=status.HTTP_201_CREATED)
+                return Response({"message" : f"업로드된 사진 삭제 중 에러 발생: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+        # 4) log 테이블에 인스턴스 추가
+        try:
+            log_data = {
+                "photo_num" : photo_num,
+                "species_code" : species_code,
+                "reg_date" : datetime.now().isoformat(),
+                "id" : request.user.id
+            }
+
+            supabase.table("log").insert(log_data).execute()
+        except Exception as e:
+            return Response({"message" : f"Supabase log table upload failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        return Response({"message" : "로그 추가가 완료되었습니다."},status=status.HTTP_201_CREATED)
 
 # 지역별 누적 관측 횟수 뷰    
 class AreaSummaryView(APIView):

@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (
-    IdentifyView,
-    IdentifyNextView,
+    #IdentifyView,
+    #IdentifyNextView,
     IdentifyAnswerView,
     UploadBirdPhotoView,
     AreaSummaryView,
@@ -20,13 +20,13 @@ from .temp_testview import TempTestView
 
 urlpatterns = [
     # 새 식별 관련 엔드포인트
-    path("identify/", IdentifyView.as_view(), name="bird_identify"),
-    path("identify/<int:session_id>/next/", IdentifyNextView.as_view(), name="bird_identify_next"),
-    path("identify/<int:session_id>/answer/", IdentifyAnswerView.as_view(), name="bird_identify_answer"),
+    #path("identify/", IdentifyView.as_view(), name="bird_identify"),
+    #path("identify/<int:session_id>/next/", IdentifyNextView.as_view(), name="bird_identify_next"),
 
     # 새 사진 업로드 엔드포인트
-    # 사진 업로드 + 위경도 정규화 + 로그 생성
-    path("upload/photo", UploadBirdPhotoView.as_view(), name="birds_upload"),
+    # 사진 업로드 + 위경도 정규화 + photo 테이블 insert
+    path("upload/photo/", UploadBirdPhotoView.as_view(), name="birds_upload"),
+    path("identify/answer/", IdentifyAnswerView.as_view(), name="bird_identify_answer"),
     # 지역명으로 종별 누적 관측 횟수
     path("areas/search/", AreaSummaryView.as_view(), name="area_summary"),
     # 특정 지역 + 종의 관측 로그 목록
