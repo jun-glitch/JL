@@ -14,6 +14,11 @@ def encode_bytes_to_base64(image_bytes: bytes) -> str:
 
 
 def normalize_candidates(candidates: Any) -> List[Dict[str, Any]]:
+    """
+    openai_identify.py에서 dict list로 오면:
+      - rank 기준 정렬
+      - 필드 타입 정규화
+    """
     if not isinstance(candidates, list):
         return []
 
@@ -32,35 +37,65 @@ def normalize_candidates(candidates: Any) -> List[Dict[str, Any]]:
             }
         )
 
+    out = [x for x in out if x["species_code"]]
     out.sort(key=lambda x: x["rank"])
     return out
 
 
-def fetch_species_options(supabase, limit: int = 300) -> List[Dict[str, str]]:
+def _auto_get_supabase_client(supabase):
+    if supabase is not None:
+        return supabase
+    try:
+        from integrations.supabase_client import supabase  
+        return supabase
+    except Exception:
+        return None
+
+
+def fetch_species_options_all(
+    supabase,
+    page_size: int = 1000,
+    max_rows: int = 2000,
+) -> List[Dict[str, str]]:
     """
-    species 테이블에서 옵션 목록 가져오기.
-    DB 컬럼명: species_code, common_name, scientific_name (없으면 제거)
+    species 테이블에서 전체(525종) 옵션
+    - supabase range pagination 사용
+    - 컬럼명: species_code, common_name, scientific_name
     """
-    res = (
-        supabase.table("species")
-        .select("species_code, common_name, scientific_name")
-        .limit(limit)
-        .execute()
-    )
-    rows = res.data or []
+    if supabase is None:
+        return []
 
     options: List[Dict[str, str]] = []
-    for r in rows:
-        code = str(r.get("species_code") or "").strip()
-        if not code:
-            continue
-        options.append(
-            {
-                "species_code": code,
-                "common_name_ko": str(r.get("common_name") or "").strip(),
-                "scientific_name": str(r.get("scientific_name") or "").strip(),
-            }
+    start = 0
+
+    while True:
+        end = start + page_size - 1
+        res = (
+            supabase.table("species")
+            .select("species_code, common_name, scientific_name")
+            .range(start, end)
+            .execute()
         )
+        rows = res.data or []
+
+        for r in rows:
+            code = str(r.get("species_code") or "").strip()
+            if not code:
+                continue
+            options.append(
+                {
+                    "species_code": code,
+                    "common_name_ko": str(r.get("common_name") or "").strip(),
+                    "scientific_name": str(r.get("scientific_name") or "").strip(),
+                }
+            )
+
+        if len(rows) < page_size:
+            break
+
+        start += page_size
+        if start >= max_rows:
+            break
 
     return options
 
@@ -69,14 +104,15 @@ def identify_bird(
     image_file,
     supabase=None,
     mime_type: str = "image/jpeg",
-    species_limit: int = 300,
 ) -> List[Dict[str, Any]]:
-    """
-    views.py에서 업로드된 InMemoryUploadedFile/TemporaryUploadedFile을 받는 용도.
-    ✅ supabase를 넘겨주면 species_options를 읽어서 'DB 종만' 후보로 제한합니다.
-    """
+
     try:
-        # 1) 업로드 파일 bytes 읽기 (포인터 복구 포함)
+        sb = _auto_get_supabase_client(supabase)
+        if sb is None:
+            # supabase 연결이 없으면 실패 처리(빈 리스트)
+            print("[Identify] supabase client missing -> return []")
+            return []
+
         try:
             image_file.seek(0)
         except Exception:
@@ -96,18 +132,18 @@ def identify_bird(
 
         mt = getattr(image_file, "content_type", None) or mime_type
 
-        # 2) species_options 준비 (supabase가 있을 때만)
-        species_options: Optional[List[Dict[str, str]]] = None
-        if supabase is not None:
-            species_options = fetch_species_options(supabase, limit=species_limit)
-            print(f"[Identify] species_options count={len(species_options)}")
+        species_options = fetch_species_options_all(sb)
+        if not species_options:
+            print("[Identify] species_options empty -> return []")
+            return []
+        print(f"[Identify] species_options count={len(species_options)}")
 
-        # 3) OpenAI 호출 (옵션 전달)
         candidates = identify_with_gpt(
             base64_image=base64_image,
             mime_type=mt,
             species_options=species_options,
         )
+
         return normalize_candidates(candidates)
 
     except Exception as e:
