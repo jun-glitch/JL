@@ -1,29 +1,39 @@
 import 'dart:io';
+import 'package:birder_frontend/models/api_client.dart';
 import 'package:birder_frontend/screens/my_log.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
-/// TODO: DB/서버에서 내려줄 후보 새 데이터 모델로 교체
+
 class BirdCandidate {
   final String nameKo;
   final String nameSci;
   final String description;
-  final String imageUrl; // 데모용 (추후 DB/서버 이미지로 변경)
+  final String imageUrl;
+  final int rank;
+  final String speciesCode;
 
   BirdCandidate({
     required this.nameKo,
     required this.nameSci,
     required this.description,
     required this.imageUrl,
+    required this.rank,
+    required this.speciesCode,
   });
 }
 
 class IdentifyOverlayPage extends StatefulWidget {
-  /// 카메라/갤러리에서 선택한 사진 1~2장
   final List<File> photos;
   final List<Map<String, dynamic>>? initialCandidates;
+  final String photoNum;
 
-  const IdentifyOverlayPage({super.key, required this.photos, this.initialCandidates});
+  const IdentifyOverlayPage({
+    super.key,
+    required this.photos,
+    this.initialCandidates,
+    required this.photoNum,
+  });
 
   @override
   State<IdentifyOverlayPage> createState() => _IdentifyOverlayPageState();
@@ -42,13 +52,7 @@ class _IdentifyOverlayPageState extends State<IdentifyOverlayPage> {
   bool _loading = true;
   String? _errorText;
 
-  late final Dio _dio = Dio(
-    BaseOptions(
-      baseUrl: 'http://10.0.2.2:8000',
-      connectTimeout: const Duration(seconds: 80),
-      receiveTimeout: const Duration(seconds: 80),
-    ),
-  );
+  final Dio _dio = ApiClient().dio;
 
   @override
   void initState() {
@@ -64,11 +68,13 @@ class _IdentifyOverlayPageState extends State<IdentifyOverlayPage> {
           nameKo: (c['common_name_ko'] ?? '').toString(),
           nameSci: (c['scientific_name'] ?? '').toString(),
           description: (c['short_description'] ?? '').toString(),
-          imageUrl: '',
+          imageUrl: (c['wikimedia_image_url'] ?? '').toString(),
+          rank: (c['rank'] ?? 999),
+          speciesCode: (c['species_code'] ?? '').toString(),
         )).toList();
       });
     } else {
-      _requestIdentify(); // 기존 로직
+      _requestIdentify();
     }
 
   }
@@ -94,15 +100,18 @@ class _IdentifyOverlayPageState extends State<IdentifyOverlayPage> {
       });
 
       final res = await _dio.post(
-        '/api/birds/identify/',
+        '/api/birds/test/',
         data: formData,
         options: Options(contentType: 'multipart/form-data'),
       );
 
-      final data = (res.data is Map) ? Map<String, dynamic>.from(res.data) : <
-          String,
-          dynamic>{};
-      final list = (data['candidates'] as List?) ?? [];
+      final data = res.data;
+
+      final raw = (data is Map)
+          ? (data['list'] ?? data['candidates'] ?? data['out'])
+          : data;
+
+      final list = (raw is List) ? raw : const [];
 
 
       final candidates = list
@@ -113,9 +122,13 @@ class _IdentifyOverlayPageState extends State<IdentifyOverlayPage> {
             nameKo: (c['common_name_ko'] ?? '').toString(),
             nameSci: (c['scientific_name'] ?? '').toString(),
             description: (c['short_description'] ?? '').toString(),
-            imageUrl: '', // 후보 이미지 url
+            imageUrl: (c['wikimedia_image_url'] ?? '').toString(),
+            rank: (c['rank'] ?? 999),
+            speciesCode: (c['species_code'] ?? '').toString(),
           ))
           .toList();
+
+      candidates.sort((a, b) => a.rank.compareTo(b.rank));
 
       if (!mounted) return;
       setState(() {
@@ -152,11 +165,17 @@ class _IdentifyOverlayPageState extends State<IdentifyOverlayPage> {
     final picked = _candidates[_candIndex];
 
     try {
+
+      final formData = FormData.fromMap({
+        'photo_num': widget.photoNum,
+        'species_code': picked.speciesCode,
+      });
+
       await _dio.post(
-        '/api/birds/confirm',
-        data: {
-          'scientific_name': picked.nameSci
-        },
+        '/api/birds/identify/answer/',
+        data: formData,
+        options: Options(contentType: 'multipart/form-data'),
+
       );
 
     if (!mounted) return;
@@ -177,17 +196,16 @@ class _IdentifyOverlayPageState extends State<IdentifyOverlayPage> {
           ),
     );
     } on DioException catch (e) {
-      debugPrint('confirm 실패: ${e.response?.statusCode} ${e.response?.data}');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('도감 추가에 실패했어요.')),
-      );
+      debugPrint('confirm photoNum="${widget.photoNum}"');
+      debugPrint('confirm speciesCode="${picked.speciesCode}"');
+      debugPrint('confirm status=${e.response?.statusCode}');
+      debugPrint('confirm data=${e.response?.data}');
+      debugPrint('confirm req=${e.requestOptions.data}');
+      rethrow;
     }
   }
 
   Future<void> _onNo() async {
-    // TODO: 재촬영 유도 / 다른 분류 플로우로 이동
-    // Navigator.push(... 정확도 안내 페이지);
 
     if (!mounted) return;
     await showDialog(

@@ -97,7 +97,8 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       final photoNum = result['photo_num']?.toString() ?? '';
-      final candidates = (result['candidates'] as List? ?? [])
+      final raw = result['list'] ?? result['candidates'] ?? result['out'];
+      final candidates = (raw as List? ?? [])
           .whereType<Map>()
           .map((e) => Map<String, dynamic>.from(e))
           .toList();
@@ -110,7 +111,9 @@ class _HomeScreenState extends State<HomeScreen> {
             MaterialPageRoute(
               builder: (_) => IdentifyOverlayPage(
                   photos: [file],
-                  initialCandidates: candidates,),
+                  initialCandidates: candidates,
+                  photoNum: photoNum,
+              ),
             ),
           );
         },
@@ -144,7 +147,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
 
       final photoNum = result['photo_num']?.toString();
-      final candidates = (result['candidates'] as List? ?? [])
+      final raw = result['list'] ?? result['candidates'] ?? result['out'];
+      final candidates = (raw as List? ?? [])
           .whereType<Map>()
           .map((e) => Map<String, dynamic>.from(e))
           .toList();
@@ -157,6 +161,7 @@ class _HomeScreenState extends State<HomeScreen> {
               builder: (_) => IdentifyOverlayPage(
                   photos: [file],
                   initialCandidates: candidates,
+                photoNum: photoNum ?? '',
               ),
             ),
           );
@@ -286,7 +291,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // ✅ 임시 버튼 오버레이 (나중에 이 블록만 삭제하면 됨)
+          /*
           Positioned(
             top: MediaQuery.of(context).padding.top + 8, // 상태바 아래
             right: 12,
@@ -320,6 +325,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
+          */
 
           // MY Log
           _buildBubbleButton(
@@ -667,7 +673,7 @@ class _UploadResultDialog extends StatelessWidget {
               height: 44,
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: onConfirm ??() => Navigator.pop(context),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFD7E8FF),
                   foregroundColor: Colors.black87,
