@@ -218,7 +218,7 @@ class UploadBirdPhotoView(APIView):
                 species_code = candidate['species_code']
                 detail = supabase.table('species').select('detail').eq('species_code', species_code).single().execute()
                 if detail:
-                    candidate['detail'] = detail
+                    candidate['detail'] = detail.data.get('detail')
         
         except Exception as e:
             return Response({"message" : f"AI identification Error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
