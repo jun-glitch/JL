@@ -91,7 +91,8 @@ Birder는 **OpenAI Vision API를 활용한 조류 종 분류**, **개인 도감*
 ## 📈 Project Roadmap
 
 - [x] 요구사항 정의  
-- [x] Figma 프로토타입  
+- [x] Figma 프로토타입
+- [x] ERD 설계 
 - [x] Backend 개발  
 - [x] Frontend 개발    
 - [ ] 통합 테스트  
