@@ -114,6 +114,13 @@ class _BirdersLogAreaResultState extends State<BirdersLogAreaResult> {
     return '${_fmtDate(dt)} ${_fmtTime(dt)}';
   }
 
+  String _fmt(DateTime d) {
+    final y = d.year.toString().padLeft(4, '0');
+    final m = d.month.toString().padLeft(2, '0');
+    final day = d.day.toString().padLeft(2, '0');
+    return '$y/$m/$day';
+  }
+
   DateTime? _startDate;
   DateTime? _endDate;
 
@@ -129,14 +136,6 @@ class _BirdersLogAreaResultState extends State<BirdersLogAreaResult> {
     WidgetsBinding.instance.addPostFrameCallback((_){
       _fetchLogs();
     });
-  }
-
-
-  String _fmt(DateTime d) {
-    final y = d.year.toString().padLeft(4, '0');
-    final m = d.month.toString().padLeft(2, '0');
-    final day = d.day.toString().padLeft(2, '0');
-    return '$y/$m/$day';
   }
 
 
@@ -208,6 +207,14 @@ class _BirdersLogAreaResultState extends State<BirdersLogAreaResult> {
           ],
         ),
       ),
+    );
+  }
+
+  void _openLogPopup(ObservationLog log) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => _LogPopupFromObservation(log: log),
     );
   }
 
@@ -464,8 +471,14 @@ class _BirdersLogAreaResultState extends State<BirdersLogAreaResult> {
                   separatorBuilder: (_, __) => const SizedBox(height: 6),
                   itemBuilder: (context, i) {
                     final log = _logs[i];
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+
+                    return InkWell(
+                      onTap: () => _openLogPopup(log),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
                       child: Row(
                         children: [
                           Expanded(
@@ -497,6 +510,7 @@ class _BirdersLogAreaResultState extends State<BirdersLogAreaResult> {
                           ),
                         ],
                       ),
+                    ),
                     );
                   },
                 ),
@@ -510,36 +524,144 @@ class _BirdersLogAreaResultState extends State<BirdersLogAreaResult> {
 }
 
 class ObservationLog {
-  final String location;    // 위도 경도
+  final int? logId;
+  final String? sFileNum;
   final DateTime? obsDate;
   final DateTime? regDate;
-  final String? photoUrl;
-  final String? areaFull;
+  final String location;
+  final double? latitude;
+  final double? longitude;
 
   ObservationLog({
+    this.logId,
+    this.sFileNum,
+    this.obsDate,
+    this.regDate,
     required this.location,
-    required this.obsDate,
-    required this.regDate,
-    this.photoUrl,
-    this.areaFull,
+    this.latitude,
+    this.longitude,
   });
-
-  static DateTime? _parseDt(dynamic v) {
-    if (v == null) return null;
-    final s = v.toString().trim();
-    if (s.isEmpty) return null;
-    return DateTime.tryParse(s);
-  }
 
   DateTime? get displayDate => obsDate ?? regDate;
 
   factory ObservationLog.fromJson(Map<String, dynamic> json) {
+    DateTime? _parseDate(dynamic v) {
+      if (v == null) return null;
+      final s = v.toString();
+      if (s.isEmpty) return null;
+      return DateTime.tryParse(s);
+    }
+
+    double? _parseDouble(dynamic v) {
+      if (v == null) return null;
+      if (v is num) return v.toDouble();
+      return double.tryParse(v.toString());
+    }
+
+    int? _parseInt(dynamic v) {
+      if (v == null) return null;
+      if (v is int) return v;
+      return int.tryParse(v.toString());
+    }
+
     return ObservationLog(
+      logId: _parseInt(json['log_num']),
+      sFileNum: (json['s_filenum'] ?? '').toString().trim(),
+      obsDate: _parseDate(json['obs_date']),
+      regDate: _parseDate(json['reg_date']),
       location: (json['location'] ?? '').toString(),
-      obsDate: _parseDt(json['obs_date']),
-      regDate: _parseDt(json['reg_date']),
-      photoUrl: (json['photo_url'] ?? json['img_url'] ?? json['image_url'])?.toString(), // ✅ 키는 서버에 맞춰
-      areaFull: (json['area_full'] ?? json['location'])?.toString(),
+      latitude: _parseDouble(json['latitude']),
+      longitude: _parseDouble(json['longitude']),
+    );
+  }
+}
+class _LogPopupFromObservation extends StatelessWidget {
+  final ObservationLog log;
+  const _LogPopupFromObservation({required this.log});
+
+  String _fmtDateTimeOrDash(DateTime? dt) {
+    if (dt == null) return '-';
+    final y = dt.year.toString().padLeft(4, '0');
+    final m = dt.month.toString().padLeft(2, '0');
+    final d = dt.day.toString().padLeft(2, '0');
+    final hh = dt.hour.toString().padLeft(2, '0');
+    final mm = dt.minute.toString().padLeft(2, '0');
+    final ss = dt.second.toString().padLeft(2, '0');
+    return '$y.$m.$d  $hh:$mm:$ss';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = (log.location).toString().trim();
+    final area = loc.isEmpty ? '위치 정보 없음' : loc;
+
+    final when = log.obsDate ?? log.regDate;
+    final whenText = _fmtDateTimeOrDash(when);
+
+    final url = (log.sFileNum ?? '').trim();
+
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  area,
+                  style: const TextStyle(
+                    fontFamily: 'Paperlogy',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 18,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  whenText,
+                  style: const TextStyle(
+                    fontFamily: 'Paperlogy',
+                    fontWeight: FontWeight.w400,
+                    fontSize: 14,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: url.isEmpty
+                      ? const SizedBox(
+                    height: 350,
+                    child: Center(child: Text('사진 URL이 없습니다')),
+                  )
+                      : Image.network(
+                    url,
+                    height: 350,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const SizedBox(
+                      height: 350,
+                      child: Center(child: Text('사진을 불러올 수 없습니다')),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            right: 6,
+            top: 6,
+            child: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

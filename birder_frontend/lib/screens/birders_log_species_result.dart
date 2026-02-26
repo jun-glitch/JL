@@ -586,6 +586,7 @@ class SpeciesMapRecord {
       if (v is int) return v;
       return int.tryParse(v.toString());
     }
+
     return SpeciesMapRecord(
       logId: _parseInt(json['log_num']),
       sFileNum: (json['s_filenum'] ?? '').toString().trim(),
