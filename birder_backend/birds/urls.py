@@ -25,7 +25,7 @@ urlpatterns = [
 
     # 새 사진 업로드 엔드포인트
     # 사진 업로드 + 위경도 정규화 + photo 테이블 insert
-    path("upload/photo/", UploadBirdPhotoView.as_view(), name="birds_upload"),
+    path("identify/photo/", UploadBirdPhotoView.as_view(), name="birds_upload"),
     path("identify/answer/", IdentifyAnswerView.as_view(), name="bird_identify_answer"),
     # 지역명으로 종별 누적 관측 횟수
     path("areas/search/", AreaSummaryView.as_view(), name="area_summary"),
