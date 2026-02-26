@@ -6,7 +6,7 @@
 ![DRF](https://img.shields.io/badge/DRF-REST_Framework-red?logo=django&logoColor=white)
 ![GeoDjango](https://img.shields.io/badge/GeoDjango-GIS-green)
 ![GitHub](https://img.shields.io/badge/GitHub-Repo-181717?logo=github)
-![Supabase](https://img.shields.io/badge/Supabase-Storage%20%2B%20Postgres-3ECF8E?logo=supabase&logoColor=white) 
+![Supabase](https://img.shields.io/badge/Supabase-Storage-3ECF8E?logo=supabase&logoColor=white) 
 ---
 
 Birder는 **OpenAI Vision API를 활용한 조류 종 분류**, **개인 도감**, **위치 기반 관측 기록 조회 기능**을 제공하는 탐조(Bird Watching) 어플입니다.
@@ -85,6 +85,7 @@ Birder는 **OpenAI Vision API를 활용한 조류 종 분류**, **개인 도감*
 │   └── main.dart
 │
 └── README.md
+```
 ---
 
 ## 📈 Project Roadmap
