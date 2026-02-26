@@ -515,11 +515,15 @@ class ObservationLog {
   final String location;    // 위도 경도
   final DateTime? obsDate;
   final DateTime? regDate;
+  final String? photoUrl;
+  final String? areaFull;
 
   ObservationLog({
     required this.location,
     required this.obsDate,
     required this.regDate,
+    this.photoUrl,
+    this.areaFull,
   });
 
   static DateTime? _parseDt(dynamic v) {
@@ -536,6 +540,8 @@ class ObservationLog {
       location: (json['location'] ?? '').toString(),
       obsDate: _parseDt(json['obs_date']),
       regDate: _parseDt(json['reg_date']),
+      photoUrl: (json['photo_url'] ?? json['img_url'] ?? json['image_url'])?.toString(), // ✅ 키는 서버에 맞춰
+      areaFull: (json['area_full'] ?? json['location'])?.toString(),
     );
   }
 }

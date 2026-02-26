@@ -132,61 +132,115 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
     const LatLng(38.8, 131.1), // 북동
   );
 
-  Future<List<LatLng>> _fetchObservationPoints({
+  void _openLogPopup(SpeciesMapRecord r) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => _LogPopup(record: r),
+    );
+  }
+
+  Future<List<MapPoint>> _fetchMapPoints({
     required DateTime? start,
     required DateTime? end,
   }) async {
-
     final dio = ApiClient().dio;
     final speciesCode = widget.speciesCode.trim();
 
-    final qp = <String, dynamic>{
-      'species_code': speciesCode,
-    };
+    // if (start == null || end == null) return [];
 
+    final qp = <String, dynamic>{ 'species_code': speciesCode };
     if (start != null) qp['start'] = _fmt(start);
     if (end != null) qp['end'] = _fmt(end);
 
-    debugPrint('--- MAP API 요청 확인 ---');
-    debugPrint('species_code: "$speciesCode"');
+    final res = await dio.get(
+        '/api/birds/map/points/',
+        queryParameters: qp
+    );
+
+    /*final res = await dio.get(
+      '/api/birds/species/map/points/',
+      queryParameters: {
+        'species_code': speciesCode,
+        'start': _fmt(start),
+        'end': _fmt(end),
+      },
+    );
+
+     */
+
+    final data = res.data;
+    if (data is! Map) return [];
+
+    final list = (data['points'] as List?) ?? [];
+    return list
+        .whereType<Map>()
+        .map((e) => MapPoint.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+  Future<void> _onMarkerTap(MapPoint p) async {
+    final dio = ApiClient().dio;
+    final speciesCode = widget.speciesCode.trim();
+    final start = _startDate;
+    final end = _endDate;
+
+    if (start == null || end == null) return;
+
+    // 로딩
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
 
     try {
       final res = await dio.get(
-        '/api/birds/species/map/',
-        queryParameters: qp,
+        '/api/birds/map/records/',
+        queryParameters: {
+          'species_code': speciesCode,
+          'start': _fmt(start),
+          'end': _fmt(end),
+          'grid_lat': p.gridLat.toStringAsFixed(4),
+          'grid_lng': p.gridLng.toStringAsFixed(4),
+        },
       );
 
-      debugPrint('map status=${res.statusCode}');
-      debugPrint('map uri=${res.realUri}');
-      debugPrint('map data=${res.data}');
+      if (!mounted) return;
+      Navigator.of(context).pop(); // 로딩 닫기
 
-      final data = res.data;
-      if (data is! Map) return [];
+      final data = res.data as Map<String, dynamic>;
+      final list = (data['records'] as List?) ?? [];
 
-      final points = (data['records'] as List?) ?? [];
+      final records = list
+          .whereType<Map>()
+          .map((e) => SpeciesMapRecord.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
 
-      return points.map((p) {
-        final m = Map<String, dynamic>.from(p);
-        final lat = (m['latitude'] as num).toDouble();
-        final lng = (m['longitude'] as num).toDouble();
-        return LatLng(lat, lng);
-      }).toList();
+      if (records.isEmpty) {
+        showDialog(
+          context: context,
+          builder: (_) => const AlertDialog(content: Text('해당 지점 기록이 없습니다.')),
+        );
+        return;
+      }
+
+      _openLogPopup(records.first);
+
     } on DioException catch (e) {
-      debugPrint('❌ map DioException status=${e.response?.statusCode}');
-      debugPrint('❌ map DioException uri=${e.requestOptions.uri}');
-      debugPrint('❌ map DioException data=${e.response?.data}');
-      rethrow;
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(content: Text('기록 불러오기 실패: ${e.response?.data ?? e.message}')),
+      );
     }
   }
-
 
   Future<void> _loadKoreaOutline() async {
     final data = await rootBundle.loadString('assets/geo/korea_sido.geojson');
     _geoParser.parseGeoJsonAsString(data);
   }
-
-
-  Widget _buildKoreaMap(List<LatLng> points) {
+  Widget _buildKoreaMap(List<MapPoint> points) {
     final lines = _geoParser.polygons.expand((pg) {
       final pts = pg.points;
       if (pts.isEmpty) return <Polyline>[];
@@ -198,6 +252,7 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
         ),
       ];
     }).toList();
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
       child: FlutterMap(
@@ -206,26 +261,33 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
           initialZoom: 6.7,
           minZoom: 5,
           maxZoom: 18,
-          // 대한민국 범위
           cameraConstraint: CameraConstraint.contain(bounds: _southKoreaBounds),
           backgroundColor: Colors.transparent,
         ),
         children: [
-          //지도 아웃라인
           PolylineLayer(polylines: lines),
 
-          // 로그 점 (위도/경도) 찍기
           MarkerLayer(
             markers: points.map((p) {
               return Marker(
-                point: p,
-                width: 15,
-                height: 15,
-                child: Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(0xFF1F66FF), // 점 색
-                    border: Border.all(color: Colors.white, width: 2),
+                point: LatLng(p.gridLat, p.gridLng),
+                width: 18,
+                height: 18,
+                child: GestureDetector(
+                  onTap: () => _onMarkerTap(p),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF1F66FF),
+                      border: Border.all(color: Colors.white, width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          blurRadius: 6,
+                          color: Colors.black.withOpacity(0.15),
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               );
@@ -235,15 +297,14 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
       ),
     );
   }
-
   Widget _buildKoreaMapWithOverlay({
-    required List<LatLng> points,
+    required List<MapPoint> points,
     String? overlayMessage,
     bool showLoading = false,
   }) {
     return Stack(
       children: [
-        _buildKoreaMap(points), //아웃라인
+        _buildKoreaMap(points), // 아웃라인 + 마커(탭 가능)
 
         if (showLoading)
           Positioned.fill(
@@ -294,7 +355,6 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
       ],
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -450,32 +510,26 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
                     if (outlineSnap.connectionState != ConnectionState.done) {
                       return const Center(child: CircularProgressIndicator());
                     }
-
-                    return FutureBuilder<List<LatLng>>(
-                      future: _fetchObservationPoints(
-                        start: _startDate,
-                        end: _endDate,
-                      ),
-                      builder: (context, pointSnap) {
-                        // 로딩중 (지도 아웃라인, 로딩)
-                        if (pointSnap.connectionState != ConnectionState.done) {
+                    return FutureBuilder<List<MapPoint>>(
+                      future: _fetchMapPoints(start: _startDate, end: _endDate),
+                      builder: (context, snap) {
+                        if (snap.connectionState != ConnectionState.done) {
+                          return _buildKoreaMapWithOverlay(points: const [], showLoading: true);
+                        }
+                        if (snap.hasError) {
                           return _buildKoreaMapWithOverlay(
                             points: const [],
-                            showLoading: true,
+                            overlayMessage: '포인트 로드 에러: ${snap.error}',
                           );
                         }
-
-                        // 에러 (지도 아웃라인, 에러 메세지)
-                        if (pointSnap.hasError) {
+                        final points = snap.data ?? const <MapPoint>[];
+                        if (points.isEmpty) {
                           return _buildKoreaMapWithOverlay(
                             points: const [],
-                            overlayMessage: '포인트 로드 에러: ${pointSnap.error}',
+                            overlayMessage: '조건에 맞는 관측 기록이 없습니다.',
                           );
                         }
-
-                        // 정상
-                        final pts = pointSnap.data ?? const <LatLng>[];
-                        return _buildKoreaMapWithOverlay(points: pts);
+                        return _buildKoreaMapWithOverlay(points: points);
                       },
                     );
                   },
@@ -490,6 +544,19 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
     );
   }
 
+}
+class MapPoint {
+  final double gridLat;
+  final double gridLng;
+  final int count;
+
+  MapPoint({required this.gridLat, required this.gridLng, required this.count});
+
+  factory MapPoint.fromJson(Map<String, dynamic> j) => MapPoint(
+    gridLat: (j['grid_lat'] as num).toDouble(),
+    gridLng: (j['grid_lng'] as num).toDouble(),
+    count: (j['count'] as num).toInt(),
+  );
 }
 
 class SpeciesMapRecord {
@@ -517,6 +584,121 @@ class SpeciesMapRecord {
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
       photoUrl: json['photo_url']?.toString(),
+    );
+  }
+}
+
+class _LogPopup extends StatelessWidget {
+  final SpeciesMapRecord record;
+  const _LogPopup({required this.record});
+
+  String _fmtDateTime(dynamic v) {
+    try {
+      DateTime dt;
+      if (v is DateTime) {
+        dt = v;
+      } else {
+        dt = DateTime.parse(v.toString()).toLocal();
+      }
+
+      final y = dt.year.toString().padLeft(4, '0');
+      final m = dt.month.toString().padLeft(2, '0');
+      final d = dt.day.toString().padLeft(2, '0');
+      final hh = dt.hour.toString().padLeft(2, '0');
+      final mm = dt.minute.toString().padLeft(2, '0');
+      final ss = dt.second.toString().padLeft(2, '0');
+      return '$y.$m.$d  $hh:$mm:$ss';
+    } catch (_) {
+      return v?.toString() ?? '';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final area = record.areaFull.isEmpty ? '위치 정보 없음' : record.areaFull;
+    final when = _fmtDateTime(record.obsDate);
+    final url = record.photoUrl;
+
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  area,
+                  style: const TextStyle(
+                    fontFamily: 'Paperlogy',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 18,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  when,
+                  style: const TextStyle(
+                    fontFamily: 'Paperlogy',
+                    fontWeight: FontWeight.w400,
+                    fontSize: 14,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: AspectRatio(
+                    aspectRatio: 1.2, // 원하는 비율로 조절
+                    child: (url == null || url.isEmpty)
+                        ? Container(
+                      color: Colors.black12,
+                      child: const Center(
+                        child: Text(
+                          '사진 없음',
+                          style: TextStyle(fontFamily: 'Paperlogy'),
+                        ),
+                      ),
+                    )
+                        : Image.network(
+                      url,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return const Center(child: CircularProgressIndicator());
+                      },
+                      errorBuilder: (_, __, ___) => Container(
+                        color: Colors.black12,
+                        child: const Center(
+                          child: Text(
+                            '이미지 로드 실패',
+                            style: TextStyle(fontFamily: 'Paperlogy'),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // 오른쪽 위 X 버튼
+          Positioned(
+            top: 6,
+            right: 6,
+            child: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.of(context).pop(),
+              splashRadius: 20,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
