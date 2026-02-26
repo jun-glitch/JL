@@ -31,9 +31,6 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
   void initState() {
     super.initState();
 
-    _startDate = null; //DateTime(2000, 1, 1);
-    _endDate = null; //DateTime(now.year, now.month + 1, 0); // 이번 달 마지막 날
-
     _outlineFuture = _loadKoreaOutline();
   }
 
@@ -43,6 +40,16 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
     final day = d.day.toString().padLeft(2, '0');
     return '$y-$m-$day';
   }
+  String _fmtDateTime(DateTime dt) {
+    final y = dt.year.toString().padLeft(4, '0');
+    final m = dt.month.toString().padLeft(2, '0');
+    final d = dt.day.toString().padLeft(2, '0');
+    final hh = dt.hour.toString().padLeft(2, '0');
+    final mm = dt.minute.toString().padLeft(2, '0');
+    final ss = dt.second.toString().padLeft(2, '0');
+    return '$y.$m.$d  $hh:$mm:$ss';
+  }
+
 
   Future<void> _pickStartDate() async {
     final now = DateTime.now();
@@ -140,118 +147,133 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
     );
   }
 
-  Future<List<MapPoint>> _fetchMapPoints({
-    required DateTime? start,
-    required DateTime? end,
-  }) async {
-    final dio = ApiClient().dio;
-    final speciesCode = widget.speciesCode.trim();
+  void _openRecordPopup(SpeciesMapRecord r) {
+    final when = r.obsDate ?? r.regDate;
+    final whenText = when == null ? '-' : _fmtDateTime(when);
 
-    // if (start == null || end == null) return [];
+    final url = (r.sFileNum ?? '').trim();
+    final hasUrl = url.isNotEmpty;
 
-    final qp = <String, dynamic>{ 'species_code': speciesCode };
-    if (start != null) qp['start'] = _fmt(start);
-    if (end != null) qp['end'] = _fmt(end);
-
-    final res = await dio.get(
-        '/api/birds/species/map/',
-        queryParameters: qp
-    );
-
-    /*final res = await dio.get(
-      '/api/birds/species/map/points/',
-      queryParameters: {
-        'species_code': speciesCode,
-        'start': _fmt(start),
-        'end': _fmt(end),
-      },
-    );
-
-     */
-
-    final data = res.data;
-    if (data is! Map) return [];
-
-    final list = (data['points'] as List?) ?? [];
-    return list
-        .whereType<Map>()
-        .map((e) => MapPoint.fromJson(Map<String, dynamic>.from(e)))
-        .toList();
-  }
-  Future<void> _onMarkerTap(MapPoint p) async {
-    final dio = ApiClient().dio;
-    final speciesCode = widget.speciesCode.trim();
-    final start = _startDate;
-    final end = _endDate;
-
-    if (start == null || end == null) return;
-
-    // 로딩
     showDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
+      builder: (_) => AlertDialog(
+        title: const Text('관측 기록'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (hasUrl)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.network(
+                  url,
+                  height: 160,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const SizedBox(
+                    height: 160,
+                    child: Center(child: Text('사진을 불러올 수 없습니다')),
+                  ),
+                ),
+              )
+            else
+              const SizedBox(
+                height: 160,
+                child: Center(child: Text('사진 URL이 없습니다')),
+              ),
+
+            const SizedBox(height: 10),
+
+            Text('위치: ${r.location?.isNotEmpty == true ? r.location : '-'}'),
+
+            const SizedBox(height: 6),
+
+            Text('일시: $whenText'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('닫기'),
+          ),
+        ],
+      ),
     );
-
-    try {
-      final res = await dio.get(
-        '/api/birds/species/map/',
-        queryParameters: {
-          'species_code': speciesCode,
-          'start': _fmt(start),
-          'end': _fmt(end),
-          'grid_lat': p.gridLat.toStringAsFixed(4),
-          'grid_lng': p.gridLng.toStringAsFixed(4),
-        },
-      );
-
-      if (!mounted) return;
-      Navigator.of(context).pop(); // 로딩 닫기
-
-      final data = res.data as Map<String, dynamic>;
-      final list = (data['records'] as List?) ?? [];
-
-      final records = list
-          .whereType<Map>()
-          .map((e) => SpeciesMapRecord.fromJson(Map<String, dynamic>.from(e)))
-          .toList();
-
-      if (records.isEmpty) {
-        showDialog(
-          context: context,
-          builder: (_) => const AlertDialog(content: Text('해당 지점 기록이 없습니다.')),
-        );
-        return;
-      }
-
-      _openLogPopup(records.first);
-
-    } on DioException catch (e) {
-      if (!mounted) return;
-      Navigator.of(context).pop();
-      showDialog(
-        context: context,
-        builder: (_) => AlertDialog(content: Text('기록 불러오기 실패: ${e.response?.data ?? e.message}')),
-      );
-    }
   }
+
+
+    Future<List<SpeciesMapRecord>> _fetchRecords() async {
+    final dio = ApiClient().dio;
+
+    final qp = <String, dynamic>{
+      'species_code': widget.speciesCode,
+    };
+
+    if (_startDate != null) qp['start'] = _fmt(_startDate!);
+    if (_endDate != null) qp['end'] = _fmt(_endDate!);
+
+    final res = await dio.get('/api/birds/species/map/', queryParameters: qp);
+
+    final data = res.data;
+    if (data is! Map) return const [];
+
+    final raw = data['records'];
+    final list = (raw is List) ? raw : const [];
+
+    return list
+        .whereType<Map>()
+        .map((e) => SpeciesMapRecord.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
 
   Future<void> _loadKoreaOutline() async {
     final data = await rootBundle.loadString('assets/geo/korea_sido.geojson');
     _geoParser.parseGeoJsonAsString(data);
   }
-  Widget _buildKoreaMap(List<MapPoint> points) {
+
+  void _onMarkerTap(SpeciesMapRecord r) {
+    _openLogPopup(r);
+  }
+
+  Widget _buildKoreaMap(List<SpeciesMapRecord> records) {
+
     final lines = _geoParser.polygons.expand((pg) {
       final pts = pg.points;
       if (pts.isEmpty) return <Polyline>[];
       return [
-        Polyline(
-          points: pts,
-          strokeWidth: 1.2,
-          color: const Color(0xFF7AA6F5),
+        Polyline(points: pts, strokeWidth: 1.2, color: const Color(0xFF7AA6F5)),
+        ];
+       }).toList();
+
+
+    final markers = records
+        .where((r) => r.latitude != null && r.longitude != null)
+        .map(
+          (r) => Marker(
+        point: LatLng(r.latitude!, r.longitude!),
+        width: 18,
+        height: 18,
+        child: GestureDetector(
+          onTap: () => _onMarkerTap(r),
+          child: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFF1F66FF),
+              border: Border.all(color: Colors.white, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  blurRadius: 6,
+                  color: Colors.black.withOpacity(0.15),
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+          ),
         ),
-      ];
-    }).toList();
+      ),
+    )
+        .toList();
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
@@ -265,46 +287,23 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
           backgroundColor: Colors.transparent,
         ),
         children: [
-          PolylineLayer(polylines: lines),
 
-          MarkerLayer(
-            markers: points.map((p) {
-              return Marker(
-                point: LatLng(p.gridLat, p.gridLng),
-                width: 18,
-                height: 18,
-                child: GestureDetector(
-                  onTap: () => _onMarkerTap(p),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFF1F66FF),
-                      border: Border.all(color: Colors.white, width: 2),
-                      boxShadow: [
-                        BoxShadow(
-                          blurRadius: 6,
-                          color: Colors.black.withOpacity(0.15),
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
+          PolylineLayer(polylines: lines),
+          MarkerLayer(markers: markers),
         ],
       ),
     );
   }
+
+
   Widget _buildKoreaMapWithOverlay({
-    required List<MapPoint> points,
+    required List<SpeciesMapRecord> records,
     String? overlayMessage,
     bool showLoading = false,
   }) {
     return Stack(
       children: [
-        _buildKoreaMap(points), // 아웃라인 + 마커(탭 가능)
+        _buildKoreaMap(records), // 아웃라인 + 마커(탭 가능)
 
         if (showLoading)
           Positioned.fill(
@@ -359,7 +358,6 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
   @override
   Widget build(BuildContext context) {
     const sky = Color(0xFFDCEBFF);
-
 
     return Scaffold(
       backgroundColor: sky,
@@ -510,26 +508,29 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
                     if (outlineSnap.connectionState != ConnectionState.done) {
                       return const Center(child: CircularProgressIndicator());
                     }
-                    return FutureBuilder<List<MapPoint>>(
-                      future: _fetchMapPoints(start: _startDate, end: _endDate),
+                    return FutureBuilder<List<SpeciesMapRecord>>(
+                      future: _fetchRecords(),
                       builder: (context, snap) {
                         if (snap.connectionState != ConnectionState.done) {
-                          return _buildKoreaMapWithOverlay(points: const [], showLoading: true);
+                          return _buildKoreaMapWithOverlay(records: const [], showLoading: true);
                         }
                         if (snap.hasError) {
                           return _buildKoreaMapWithOverlay(
-                            points: const [],
+                            records: const [],
                             overlayMessage: '포인트 로드 에러: ${snap.error}',
                           );
                         }
-                        final points = snap.data ?? const <MapPoint>[];
-                        if (points.isEmpty) {
+
+                        final records = snap.data ?? const <SpeciesMapRecord>[];
+
+                        if (records.isEmpty) {
                           return _buildKoreaMapWithOverlay(
-                            points: const [],
+                            records: const [],
                             overlayMessage: '조건에 맞는 관측 기록이 없습니다.',
                           );
                         }
-                        return _buildKoreaMapWithOverlay(points: points);
+
+                        return _buildKoreaMapWithOverlay(records: records);
                       },
                     );
                   },
@@ -545,45 +546,54 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
   }
 
 }
-class MapPoint {
-  final double gridLat;
-  final double gridLng;
-  final int count;
 
-  MapPoint({required this.gridLat, required this.gridLng, required this.count});
-
-  factory MapPoint.fromJson(Map<String, dynamic> j) => MapPoint(
-    gridLat: (j['grid_lat'] as num).toDouble(),
-    gridLng: (j['grid_lng'] as num).toDouble(),
-    count: (j['count'] as num).toInt(),
-  );
-}
 
 class SpeciesMapRecord {
-  final dynamic logId;
-  final dynamic obsDate;
-  final String areaFull;
+  final int? logId;
+  final String? sFileNum;
+  final DateTime? obsDate;
+  final DateTime? regDate;
+  final String? location;
   final double? latitude;
   final double? longitude;
-  final String? photoUrl;
 
   SpeciesMapRecord({
-    required this.logId,
-    required this.obsDate,
-    required this.areaFull,
-    required this.latitude,
-    required this.longitude,
-    required this.photoUrl,
+    this.logId,
+    this.sFileNum,
+    this.obsDate,
+    this.regDate,
+    this.location,
+    this.latitude,
+    this.longitude,
   });
 
   factory SpeciesMapRecord.fromJson(Map<String, dynamic> json) {
+    DateTime? _parseDate(dynamic v) {
+      if (v == null) return null;
+      final s = v.toString();
+      if (s.isEmpty) return null;
+      return DateTime.tryParse(s);
+    }
+
+    double? _parseDouble(dynamic v) {
+      if (v == null) return null;
+      if (v is num) return v.toDouble();
+      return double.tryParse(v.toString());
+    }
+
+    int? _parseInt(dynamic v) {
+      if (v == null) return null;
+      if (v is int) return v;
+      return int.tryParse(v.toString());
+    }
     return SpeciesMapRecord(
-      logId: json['log_id'],
-      obsDate: json['obs_date'],
-      areaFull: (json['area_full'] ?? '').toString(),
-      latitude: (json['latitude'] as num?)?.toDouble(),
-      longitude: (json['longitude'] as num?)?.toDouble(),
-      photoUrl: json['photo_url']?.toString(),
+      logId: _parseInt(json['log_num']),
+      sFileNum: (json['s_filenum'] ?? '').toString().trim(),
+      obsDate: _parseDate(json['obs_date']),
+      regDate: _parseDate(json['reg_date']),
+      location: (json['location'] ?? '').toString(),
+      latitude: _parseDouble(json['latitude']),
+      longitude: _parseDouble(json['longitude']),
     );
   }
 }
@@ -615,9 +625,13 @@ class _LogPopup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final area = record.areaFull.isEmpty ? '위치 정보 없음' : record.areaFull;
-    final when = _fmtDateTime(record.obsDate);
-    final url = record.photoUrl;
+    final loc = (record.location ?? '').trim();
+    final area = loc.isEmpty ? '위치 정보 없음' : loc;
+
+    final when = record.obsDate ?? record.regDate;
+    final whenText = when == null ? '' : _fmtDateTime(when);
+
+    final url = (record.sFileNum ?? '').trim();
 
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 24),
@@ -640,7 +654,7 @@ class _LogPopup extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  when,
+                  whenText,
                   style: const TextStyle(
                     fontFamily: 'Paperlogy',
                     fontWeight: FontWeight.w400,
