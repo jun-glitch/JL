@@ -38,7 +38,7 @@ def clean_scientific_name(name: str) -> str:
 # ----------------- Wikimedia 썸네일 -----------------
 WIKIMEDIA_API = "https://commons.wikimedia.org/w/api.php"
 
-
+"""
 def fetch_wikimedia_image_url(query: str, timeout_sec: float = 2.0) -> str:
     query = (query or "").strip()
     if not query:
@@ -67,8 +67,51 @@ def fetch_wikimedia_image_url(query: str, timeout_sec: float = 2.0) -> str:
         return ""
     
     return ""
+"""
 
+def fetch_wikimedia_image_url(query: str, timeout_sec: float = 3.0) -> str:
+    query = (query or "").strip()
+    if not query:
+        print("[WIKI] empty query")
+        return ""
 
+    params = {
+        "action": "query",
+        "format": "json",
+        "generator": "search",
+        "gsrsearch": query,
+        "gsrlimit": 1,
+        "gsrnamespace": 6,   # ✅ File: namespace only (핵심)
+        "prop": "imageinfo",
+        "iiprop": "url",
+    }
+    headers = {"User-Agent": "Birder/1.0"}
+
+    try:
+        r = requests.get(WIKIMEDIA_API, params=params, headers=headers, timeout=timeout_sec)
+        print("[WIKI] status:", r.status_code, "query:", repr(query))
+        if r.status_code != 200:
+            print("[WIKI] body:", r.text[:200])
+        r.raise_for_status()
+
+        data = r.json()
+        pages = data.get("query", {}).get("pages", {})
+        if not pages:
+            print("[WIKI] no pages. keys:", list(data.keys()))
+            return ""
+
+        for _, page in pages.items():
+            imageinfo = page.get("imageinfo")
+            if imageinfo and imageinfo[0].get("url"):
+                return imageinfo[0]["url"]
+
+        print("[WIKI] pages found but no imageinfo(url). page keys sample:", list(next(iter(pages.values())).keys()))
+        return ""
+
+    except Exception as e:
+        print("[WIKI] exception:", type(e).__name__, str(e))
+        return ""
+    
 def _fetch_wiki_in_parallel(scientific_names: List[str]) -> Dict[str, str]:
     unique = [n for n in dict.fromkeys(scientific_names) if n]
     if not unique:
