@@ -215,6 +215,7 @@ class UploadBirdPhotoView(APIView):
 
 
             for candidate in candidates:
+                print(candidate['wikimedia_image_url'])
                 species_code = candidate['species_code']
                 detail = supabase.table('species').select('detail').eq('species_code', species_code).single().execute()
                 if detail:
