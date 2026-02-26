@@ -36,7 +36,7 @@ def clean_scientific_name(name: str) -> str:
 
 
 # ----------------- Wikimedia 썸네일 -----------------
-WIKIMEDIA_API = "https://en.wikipedia.org/w/api.php"
+WIKIMEDIA_API = "https://commons.wikimedia.org/w/api.php"
 
 
 def fetch_wikimedia_image_url(query: str, timeout_sec: float = 2.0) -> str:
@@ -56,13 +56,16 @@ def fetch_wikimedia_image_url(query: str, timeout_sec: float = 2.0) -> str:
         r = requests.get(WIKIMEDIA_API, params=params, timeout=timeout_sec)
         r.raise_for_status()
         data = r.json()
+
         pages = data.get("query", {}).get("pages", {})
         for _, page in pages.items():
-            thumb = page.get("thumbnail")
-            if thumb and thumb.get("source"):
-                return thumb["source"]
+            imageinfo = page.get("imageinfo")
+            if imageinfo and imageinfo[0].get("url"):
+                return imageinfo[0]["url"]
+            
     except Exception:
         return ""
+    
     return ""
 
 
