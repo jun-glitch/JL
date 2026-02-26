@@ -67,12 +67,18 @@ class _IdentifyOverlayPageState extends State<IdentifyOverlayPage> {
         _candidates = init.map((c) => BirdCandidate(
           nameKo: (c['common_name_ko'] ?? '').toString(),
           nameSci: (c['scientific_name'] ?? '').toString(),
-          description: (c['short_description'] ?? '').toString(),
+          description: (c['detail'] ?? '').toString(),
           imageUrl: (c['wikimedia_image_url'] ?? '').toString(),
           rank: (c['rank'] ?? 999),
           speciesCode: (c['species_code'] ?? '').toString(),
         )).toList();
       });
+      for (var i = 0; i < init.length; i++) {
+        final c = init[i];
+        debugPrint('--- candidate[$i] ---');
+        c.forEach((k, v) => debugPrint('  $k = $v'));
+      }
+
     } else {
       _requestIdentify();
     }
@@ -100,7 +106,7 @@ class _IdentifyOverlayPageState extends State<IdentifyOverlayPage> {
       });
 
       final res = await _dio.post(
-        '/api/birds/test/',
+        '/api/birds/identify/photo/',
         data: formData,
         options: Options(contentType: 'multipart/form-data'),
       );
@@ -121,7 +127,7 @@ class _IdentifyOverlayPageState extends State<IdentifyOverlayPage> {
           BirdCandidate(
             nameKo: (c['common_name_ko'] ?? '').toString(),
             nameSci: (c['scientific_name'] ?? '').toString(),
-            description: (c['short_description'] ?? '').toString(),
+            description: (c['detail'] ?? '').toString(),
             imageUrl: (c['wikimedia_image_url'] ?? '').toString(),
             rank: (c['rank'] ?? 999),
             speciesCode: (c['species_code'] ?? '').toString(),

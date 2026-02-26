@@ -154,7 +154,7 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
     if (end != null) qp['end'] = _fmt(end);
 
     final res = await dio.get(
-        '/api/birds/map/points/',
+        '/api/birds/species/map/',
         queryParameters: qp
     );
 
@@ -195,7 +195,7 @@ class _BirdersLogSpeciesResultState extends State<BirdersLogSpeciesResult> {
 
     try {
       final res = await dio.get(
-        '/api/birds/map/records/',
+        '/api/birds/species/map/',
         queryParameters: {
           'species_code': speciesCode,
           'start': _fmt(start),

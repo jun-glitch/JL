@@ -132,8 +132,6 @@ class _BirdersLogAreaResultState extends State<BirdersLogAreaResult> {
   }
 
 
-
-
   String _fmt(DateTime d) {
     final y = d.year.toString().padLeft(4, '0');
     final m = d.month.toString().padLeft(2, '0');

@@ -32,7 +32,7 @@ Future<File> _assetToTempFile(String assetPath, String fileName) async {
 Future<List<File>> _buildMockPhotos() async {
   final f1 = await _assetToTempFile('assets/images/bird_photo1.webp', 'bird_photo1.webp');
 
-  return [f1]; // 1장만이면 [f1]
+  return [f1];
 }
 
 
@@ -214,7 +214,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
 
     final res = await dio.post(
-      '/api/birds/test/',
+      '/api/birds/identify/photo/',
       data: formData,
       options: Options(contentType: 'multipart/form-data'),
     );
