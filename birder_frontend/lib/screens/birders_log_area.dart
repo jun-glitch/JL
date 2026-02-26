@@ -79,6 +79,7 @@ class _BirdersLogAreaState extends State<BirdersLogArea> {
   @override
   void initState() {
     super.initState();
+    _sortRegionMap();
     selectedRegion = regionMap.keys.first;
   }
 
@@ -89,7 +90,11 @@ class _BirdersLogAreaState extends State<BirdersLogArea> {
     super.dispose();
   }
 
-
+  void _sortRegionMap(){
+    for(var key in regionMap.keys) {
+      regionMap[key]?.sort();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
