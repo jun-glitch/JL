@@ -291,42 +291,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          /*
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 8, // 상태바 아래
-            right: 12,
-            child: SizedBox(
-              height: 34,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                onPressed: () async {
-                  final photos = await _buildMockPhotos();
-                  if (!context.mounted) return;
-
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => IdentifyOverlayPage(photos: photos),
-                    ),
-                  );
-                },
-                child: const Text(
-                  '임시',
-                  style: TextStyle(
-                    fontFamily: 'Paperlogy',
-                    fontWeight: FontWeight.w400,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          */
-
           // MY Log
           _buildBubbleButton(
             screenSize: screenSize,

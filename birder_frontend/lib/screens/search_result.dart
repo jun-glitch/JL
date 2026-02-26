@@ -212,17 +212,35 @@ class _IdentifyOverlayPageState extends State<IdentifyOverlayPage> {
   }
 
   Future<void> _onNo() async {
+    final picked = _candidates[_candIndex];
 
     if (!mounted) return;
+
     await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => _InfoDialog(
         message: "좀 더 정확한 사진으로\n다시 시도해주세요\n(ㅜㅜ)",
         confirmText: "확인",
-        onConfirm: () {
-          Navigator.of(context).pop();
-          Navigator.of(context).pop();
+        onConfirm: () async {
+          try {
+            final formData = FormData.fromMap({
+              'photo_num': widget.photoNum,
+            });
+
+            await _dio.post(
+              '/api/birds/identify/answer/',
+              data: formData,
+              options: Options(contentType: 'multipart/form-data'),
+            );
+
+            if (!mounted) return;
+
+            Navigator.of(context).pop(); // 다이얼로그 닫기
+            Navigator.of(context).pop(); // 이전 화면으로
+          } catch (e) {
+            debugPrint('onNo confirm error: $e');
+          }
         },
       ),
     );
@@ -231,7 +249,7 @@ class _IdentifyOverlayPageState extends State<IdentifyOverlayPage> {
   @override
   Widget build(BuildContext context) {
     final photos = widget.photos;
-    final hasMulti = photos.length > 1;
+    //final hasMulti = photos.length > 1;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -432,7 +450,7 @@ class _BottomCandidateCard extends StatelessWidget {
                   "이 새가",
                   style: TextStyle(
                     fontFamily: 'Paperlogy',
-                    fontSize: 12,
+                    fontSize: 16,
                     color: Colors.black,
                     fontWeight: FontWeight.w700,
                   ),
