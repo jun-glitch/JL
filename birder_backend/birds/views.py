@@ -234,7 +234,6 @@ class UploadBirdPhotoView(APIView):
 # 사용자가 선택한 후보 새에 대해 log 테이블에 저장하는 View
 class IdentifyAnswerView(APIView):
     permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
         photo_num = request.data.get('photo_num')
@@ -243,7 +242,7 @@ class IdentifyAnswerView(APIView):
         if not species_code: # 선택된 후보가 없는 경우
             try:
                 del_res = supabase.table('photo').delete().eq('photo_num', photo_num).execute() # 이미 저장된 사용자가 업로드한 사진에 대해 photo 테이블 인스턴스 삭제
-                img_url = del_res[0].get('s_filenum')
+                img_url = del_res.data[0].get('s_filenum')
 
                 file_path = img_url.split(f'{settings.SUPABASE_STORAGE_BUCKET}/')[-1]
 
