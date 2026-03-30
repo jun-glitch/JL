@@ -1,4 +1,5 @@
 import uuid
+import math
 from datetime import datetime
 
 import traceback
@@ -62,101 +63,16 @@ def extract_exif_data(image_file):
                     gps_info[sub_tag] = value[t]
 
         if "GPSLatitude" in gps_info and "GPSLatitudeRef" in gps_info:
-            lat = get_decimal_from_dms(gps_info["GPSLatitude"], gps_info["GPSLatitudeRef"])
-            lng = get_decimal_from_dms(gps_info["GPSLongitude"], gps_info["GPSLongitudeRef"])
+            temp_lat = get_decimal_from_dms(gps_info["GPSLatitude"], gps_info["GPSLatitudeRef"])
+            temp_lng = get_decimal_from_dms(gps_info["GPSLongitude"], gps_info["GPSLongitudeRef"])
+
+            if temp_lat is not None and not (math.isnan(temp_lat) or math.isinf(temp_lat)):
+                lat = temp_lat
+            if temp_lng is not None and not (math.isnan(temp_lng) or math.isinf(temp_lng)):
+                lng = temp_lng
     except Exception as e:
         print(f"EXIF 추출 에러: {e}")
     return lat, lng, obs_date
-
-# 세션 불필요
-"""
-class IdentifyView(APIView):
-    permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]
-
-    def post(self, request):
-        # 1) 이미지 파일 받기
-        image = request.FILES.get("image")
-        if not image:
-            return Response({"detail": "image file required"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        session = BirdIdentifySession.objects.create(
-            user=request.user,
-            image_url=None,           
-            is_finished=False,
-            current_index=0,
-        )
-
-        try:
-            top5 = identify_bird(image, supabase=supabase)  
-            try:
-                image.seek(0)
-            except Exception:
-                pass
-
-            if not top5:
-                session.delete()
-                return Response({"detail": "no candidates found"}, status=status.HTTP_502_BAD_GATEWAY)
-            
-        except Exception as e:
-            session.delete()
-            print(f"Identification error: {e}")
-            print(traceback.format_exc())
-            return Response({"detail": f"identification failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
-        normalized = []
-        for i, c in enumerate(top5[:5], start=1):
-            if isinstance(c, dict):
-                normalized.append({**c, "rank": int(c.get("rank", i))})
-            else:
-                normalized.append({"rank": i, "common_name_ko": str(c)})
-
-        # 4) 후보 DB 저장
-        for c in normalized:
-            common = c.get("common_name_ko")
-            if not common:
-                continue
-
-            BirdCandidate.objects.create(
-                session=session,
-                rank=c.get("rank", 0),
-                common_name_ko=common,
-                scientific_name=c.get("scientific_name", ""),
-                short_description=c.get("short_description", ""),
-                wikimedia_image_url=c.get("wikimedia_image_url", ""),
-            )
-
-        # 5) 세션 + 후보 전체 반환 (프론트에서 후보 리스트를 한꺼번에 받기 위해)
-        return Response(BirdIdentifySessionSerializer(session).data, status=status.HTTP_201_CREATED)
-
-# 사용자가 다음 후보 새를 요청하는 뷰
-class IdentifyNextView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    # GET 요청 시 다음 후보 새 반환
-    def get(self, request, session_id: int):
-        session = get_object_or_404(BirdIdentifySession, id=session_id, user=request.user)
-
-        if session.is_finished:
-            # 이미 끝난 세션이면 확정/종료 상태 알려주기
-            return Response(BirdIdentifySessionSerializer(session).data)
-
-        # 다음 후보 새 반환
-        candidates_qs = session.candidates.order_by("rank")
-        total = candidates_qs.count()
-
-        if session.current_index >= total:
-            session.is_finished = True
-            session.save(update_fields=["is_finished"])
-            return Response({"detail": "no more candidates", "is_finished": True, "reupload_required": True,})
-
-        candidate = candidates_qs[session.current_index]
-        return Response({
-            "session_id": session.id,
-            "index": session.current_index,
-            "candidate": BirdCandidateSerializer(candidate).data,
-        })
-"""
 
 # 사진 저장 api
 class UploadBirdPhotoView(APIView):
