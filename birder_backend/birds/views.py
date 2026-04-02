@@ -35,9 +35,35 @@ def get_decimal_from_dms(dms, ref):
         return -float(degrees + minutes + seconds)
     return float(degrees + minutes + seconds)
 
+# 위도 경도 정보를 이용해서 행정구역 반환하는 함수
+def get_address_from_coords(lat, lng):
+    # 카카오 개발자 콘솔에서 발급받은 REST API 키
+    rest_api_key = settings.KAKAO_REST_API_KEY
+    url = f"https://dapi.kakao.com/v2/local/geo/coord2address.json?x={lng}&y={lat}"
+    
+    headers = {"Authorization": f"KakaoAK {rest_api_key}"}
+    
+    try:
+        response = requests.get(url, headers=headers)
+        result = response.json()
+        
+        if result['meta']['total_count'] > 0:
+            # 주소 정보 추출 (행정구역 등)
+            address_info = result['documents'][0]['address']
+            region_1 = address_info['region_1depth_name'] # 시/도 (예: 인천광역시)
+            region_2 = address_info['region_2depth_name'] # 구/군 (예: 강화군)
+            
+            return f"{region_1} {region_2}"
+        else:
+            return None
+            
+    except Exception as e:
+        print(f"Kakao API Error: {str(e)}")
+        return None
+
 # 이미지에서 위치정보&날짜정보 추출하는 함수
 def extract_exif_data(image_file):
-    lat, lng, obs_date = None, None, None
+    lat, lng, obs_date, address = None, None, None, None
     try:
         # 이미지 열기
         img = Image.open(image_file)
@@ -70,9 +96,11 @@ def extract_exif_data(image_file):
                 lat = temp_lat
             if temp_lng is not None and not (math.isnan(temp_lng) or math.isinf(temp_lng)):
                 lng = temp_lng
+            
+            address = get_address_from_coords(lat, lng)
     except Exception as e:
         print(f"EXIF 추출 에러: {e}")
-    return lat, lng, obs_date
+    return lat, lng, obs_date, address
 
 # 사진 저장 api
 class UploadBirdPhotoView(APIView):
@@ -82,7 +110,7 @@ class UploadBirdPhotoView(APIView):
         image = request.data.get('image')
 
         # 1) 이미지에서 위치정보 추출
-        lat, lng, obs_date = extract_exif_data(image)
+        lat, lng, obs_date, address = extract_exif_data(image)
         image.seek(0)
 
         # 2) Supabase Storage에 이미지 업로드
@@ -112,7 +140,8 @@ class UploadBirdPhotoView(APIView):
                 "s_filenum" : image_url,
                 "latitude" : lat,
                 "longitude" : lng,
-                "obs_date" : obs_date.isoformat() if obs_date else None
+                "obs_date" : obs_date.isoformat() if obs_date else None,
+                "location" : address
             }
         
             db_photo_res = supabase.table("photo").insert(photo_data).execute()
