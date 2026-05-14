@@ -33,7 +33,7 @@ class FieldGuideView(APIView):
             if kwd:
                 query = query.or_(f'common_name.ilike.%{kwd}%,scientific_name.ilike.%{kwd}%')
             
-            response = query.order('order_name', desc=False).execute()
+            response = query.order('order_name', desc=False).order('common_name', desc=False).execute()
             all_data = response.data
 
             user_logs_res = supabase.table('log').select(
