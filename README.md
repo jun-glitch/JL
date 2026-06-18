@@ -88,6 +88,37 @@ Birder는 **OpenAI Vision API를 활용한 조류 종 분류**, **개인 도감*
 ```
 ---
 
+## 🕹️ How to Install
+
+### Prerequisites
+* **Flutter SDK**: `3.38.6`
+*  **Dart SDK**: `3.38.6`
+*  **Android Studio**
+*  **지원 환경**: Android 5.0 이상 실물 디바이스
+
+### Source code & Data
+* `/lib`: Flutter 앱의 모든 소스 코드
+* `/assets`: 위치 아이콘을 포함한 필수 에셋 파일 완료
+
+### How to Install & Build
+
+#### 1. 스마트폰 개발자 모드 활성화
+1. Android 스마트폰의 `설정 > 휴대전화 정보 > 소프트웨어 정보`로 이동합니다.
+2. `빌드번호(Build Number)` 항목을 연속으로 7번 클릭하여 개발자 모드를 켭니다.
+3. 다시 `설정` 메임 화면으로 돌아와 맨 하단의 `개발자옵션`으로 진입합니다.
+4. `USB 디버깅` 항목을 **활성화**합니다.
+
+#### 2. PC와 스마트폰 연결
+1. USB 데이터 케이블을 이용해 스마트폰을 PC에 연결합니다.
+2. 스마트폰 화면에 `USB 디버깅을 허용하시겠습니까?` 팝업이 뜨면 **허용** 또는 **확인**을 누릅니다.
+
+#### 3. 의존성 패키지 다운로드
+PC 터미널(프로젝트 루트 폴더)에서 아래 명령어를 실행하여 필요한 패키지를 다운로드 받습니다
+```bash
+flutter pub get
+```
+---
+
 ## 📈 Project Roadmap
 
 - [x] 요구사항 정의  
@@ -95,4 +126,4 @@ Birder는 **OpenAI Vision API를 활용한 조류 종 분류**, **개인 도감*
 - [x] ERD 설계 
 - [x] Backend 개발  
 - [x] Frontend 개발    
-- [ ] 통합 테스트  
+- [x] 통합 테스트  
